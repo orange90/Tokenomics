@@ -50,7 +50,7 @@ struct BreakevenView: View {
     private func subscriptionHeader(stats: BreakevenStats) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Color(hex: stats.primaryProviderColorHex))
+                .fill(stats.palette.primary)
                 .frame(width: 10, height: 10)
             Text(L10n.tr("breakeven.header.fmt", stats.primaryProviderName, stats.primarySubscription.planName))
                 .font(.system(size: 18, weight: .bold))
@@ -124,7 +124,8 @@ struct BreakevenView: View {
             totalMonthlyUSD: monthly,
             totalEquivalentUSD: equivalent,
             ratio: ratio,
-            timeline: timeline
+            timeline: timeline,
+            palette: BreakevenPalette.palette(for: Provider(rawValue: sub.providerKey))
         )
     }
 
@@ -195,14 +196,13 @@ struct BreakevenView: View {
         let isBreakeven = stats.ratio >= 1
         let pctText = String(format: "%.0f%%", stats.ratio * 100)
         let multiple = String(format: "%.2f", stats.ratio)
+        let palette = stats.palette
 
         ZStack(alignment: .topTrailing) {
             // 背景渐变
             RoundedRectangle(cornerRadius: 20)
                 .fill(LinearGradient(
-                    colors: isBreakeven
-                        ? [Color(hex: "#E8F8EC"), Color(hex: "#F5FBF1")]
-                        : [Color(hex: "#FFF7E6"), Color(hex: "#FFFBF0")],
+                    colors: isBreakeven ? palette.heroDoneGradient : palette.heroAlmostGradient,
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
 
@@ -217,25 +217,25 @@ struct BreakevenView: View {
                             Text("🎉").font(.system(size: 13))
                             Text(isBreakeven ? L10n.tr("breakeven.hero.cheers") : L10n.tr("breakeven.hero.keep_going"))
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#1E7E34"))
+                                .foregroundStyle(palette.deep)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
                             Capsule().fill(Color.white.opacity(0.85))
-                                .overlay(Capsule().stroke(Color(hex: "#A6E1B4"), lineWidth: 1))
+                                .overlay(Capsule().stroke(palette.softBorder, lineWidth: 1))
                         )
 
                         // 主标题
                         VStack(alignment: .leading, spacing: 2) {
                             Text(isBreakeven ? L10n.tr("breakeven.hero.title.done") : L10n.tr("breakeven.hero.title.almost"))
                                 .font(.system(size: 22, weight: .bold))
-                                .foregroundStyle(Color(hex: "#1E7E34"))
+                                .foregroundStyle(palette.deep)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                             Text(pctText)
                                 .font(.system(size: 48, weight: .heavy))
-                                .foregroundStyle(Color(hex: "#1E7E34"))
+                                .foregroundStyle(palette.deep)
                                 .monospacedDigit()
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
@@ -243,7 +243,7 @@ struct BreakevenView: View {
 
                         Text(L10n.tr("breakeven.hero.subtitle.fmt", multiple))
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(hex: "#3E6B49"))
+                            .foregroundStyle(palette.onSoft)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -259,17 +259,20 @@ struct BreakevenView: View {
                     heroMetric(
                         title: L10n.tr("breakeven.metric.paid"),
                         value: formatUSDCompact(stats.totalMonthlyUSD),
-                        subtitle: L10n.tr("breakeven.metric.paid.sub")
+                        subtitle: L10n.tr("breakeven.metric.paid.sub"),
+                        palette: palette
                     )
                     heroMetric(
                         title: L10n.tr("breakeven.metric.value"),
                         value: formatUSDCompact(stats.totalEquivalentUSD),
-                        subtitle: L10n.tr("breakeven.metric.value.sub")
+                        subtitle: L10n.tr("breakeven.metric.value.sub"),
+                        palette: palette
                     )
                     heroMetric(
                         title: L10n.tr("breakeven.metric.saved"),
                         value: formatUSDCompact(max(0, stats.totalEquivalentUSD - stats.totalMonthlyUSD)),
-                        subtitle: L10n.tr("breakeven.metric.saved.sub")
+                        subtitle: L10n.tr("breakeven.metric.saved.sub"),
+                        palette: palette
                     )
                 }
             }
@@ -279,21 +282,21 @@ struct BreakevenView: View {
     }
 
     @ViewBuilder
-    private func heroMetric(title: String, value: String, subtitle: String) -> some View {
+    private func heroMetric(title: String, value: String, subtitle: String, palette: BreakevenPalette) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 11))
-                .foregroundStyle(Color(hex: "#5A6B5E"))
+                .foregroundStyle(palette.onSoft)
                 .lineLimit(1)
             Text(value)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color(hex: "#1E7E34"))
+                .foregroundStyle(palette.deep)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(subtitle)
                 .font(.system(size: 10))
-                .foregroundStyle(Color(hex: "#7A8A7E"))
+                .foregroundStyle(palette.onSoft.opacity(0.8))
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
@@ -339,6 +342,7 @@ struct BreakevenView: View {
     @ViewBuilder
     private func badgeCard(stats: BreakevenStats) -> some View {
         let tier = userTier(ratio: stats.ratio)
+        let palette = stats.palette
         HStack(spacing: 14) {
             // 徽章图形
             badgeIcon(tier: tier)
@@ -358,7 +362,7 @@ struct BreakevenView: View {
                     .lineLimit(1)
                 Text(L10n.tr("breakeven.badge.multiples.fmt", stats.ratio))
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color(hex: "#1E7E34"))
+                    .foregroundStyle(palette.deep)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -373,7 +377,7 @@ struct BreakevenView: View {
                 HStack(alignment: .center, spacing: 6) {
                     Text("\(tier.percentile)%")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(hex: "#1E7E34"))
+                        .foregroundStyle(palette.deep)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -455,6 +459,7 @@ struct BreakevenView: View {
 
     @ViewBuilder
     private func investmentReturnCard(stats: BreakevenStats) -> some View {
+        let palette = stats.palette
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -468,7 +473,7 @@ struct BreakevenView: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(String(format: "%.0f%%", stats.ratio * 100))
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(hex: "#1E7E34"))
+                        .foregroundStyle(palette.deep)
                         .monospacedDigit()
                     Text(L10n.tr("breakeven.invret.rate"))
                         .font(.system(size: 10))
@@ -490,10 +495,10 @@ struct BreakevenView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(L10n.tr("breakeven.invret.gained"))
                         .font(.system(size: 10))
-                        .foregroundStyle(Color(hex: "#1E7E34"))
+                        .foregroundStyle(palette.deep)
                     Text(formatUSDCompact(stats.totalEquivalentUSD))
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#1E7E34"))
+                        .foregroundStyle(palette.deep)
                         .monospacedDigit()
                 }
             }
@@ -510,16 +515,13 @@ struct BreakevenView: View {
                 ZStack(alignment: .leading) {
                     // 轨道（与杆身等高居中）
                     Capsule()
-                        .fill(Color(hex: "#EAF5EE"))
+                        .fill(palette.trackBg)
                         .frame(height: bodyHeight)
 
                     // 一体化箭头：圆角细杆 + 张开箭翼 + 修长尖锋；尾浅头深，呼应「投入少→回报多」
                     ArrowBarShape(headWidth: headWidth, bodyRatio: bodyHeight / arrowSpan)
                         .fill(LinearGradient(
-                            colors: [
-                                Color(hex: "#D6F1DF"), Color(hex: "#8BDBA4"),
-                                Color(hex: "#49BC76"), Color(hex: "#27A157")
-                            ],
+                            colors: palette.arrowGradient,
                             startPoint: .leading, endPoint: .trailing
                         ))
                         .overlay(
@@ -532,7 +534,7 @@ struct BreakevenView: View {
                                 .blendMode(.plusLighter)
                         )
                         .frame(width: totalWidth, height: arrowSpan)
-                        .shadow(color: Color(hex: "#2E9B4F").opacity(0.30), radius: 7, x: 0, y: 4)
+                        .shadow(color: palette.primary.opacity(0.30), radius: 7, x: 0, y: 4)
                 }
             }
             .frame(height: 40)
@@ -554,6 +556,7 @@ struct BreakevenView: View {
 
     @ViewBuilder
     private func timelineCard(stats: BreakevenStats) -> some View {
+        let palette = stats.palette
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.tr("breakeven.timeline.title"))
                 .font(.system(size: 16, weight: .semibold))
@@ -571,8 +574,8 @@ struct BreakevenView: View {
                               : "checkmark.circle.fill")
                             .font(.system(size: 16))
                             .foregroundStyle(evt.kind == .current
-                                             ? Color(hex: "#1E7E34")
-                                             : Color(hex: "#7DD896"))
+                                             ? palette.deep
+                                             : palette.timelineSoft)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(evt.title)
@@ -617,13 +620,14 @@ struct BreakevenView: View {
 
     @ViewBuilder
     private func usageOverviewCard(stats: BreakevenStats) -> some View {
+        let palette = stats.palette
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.tr("breakeven.overview.title.fmt", stats.primaryProviderName))
                 .font(.system(size: 16, weight: .semibold))
 
             overviewRow(
                 icon: "circle.hexagongrid.fill",
-                iconColor: Color(hex: "#10A37F"),
+                iconColor: palette.primary,
                 title: L10n.tr("breakeven.overview.tokens"),
                 value: stats.primaryTokens.formatted()
             )
@@ -643,17 +647,17 @@ struct BreakevenView: View {
             HStack {
                 Text(L10n.tr("breakeven.overview.view_models"))
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color(hex: "#1E7E34"))
+                    .foregroundStyle(palette.deep)
                 Spacer()
                 Image(systemName: "arrow.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#1E7E34"))
+                    .foregroundStyle(palette.deep)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(hex: "#F2FAF4"))
+                    .fill(palette.softBg)
             )
 
             Spacer(minLength: 0)
@@ -686,6 +690,7 @@ struct BreakevenView: View {
 
     @ViewBuilder
     private func apiComparisonCard(stats: BreakevenStats) -> some View {
+        let palette = stats.palette
         let saved = max(0, stats.totalEquivalentUSD - stats.totalMonthlyUSD)
         let savedPct = stats.totalEquivalentUSD > 0
             ? saved / stats.totalEquivalentUSD * 100
@@ -736,18 +741,18 @@ struct BreakevenView: View {
             HStack(spacing: 12) {
                 Text("😎")
                     .font(.system(size: 34))
-                    .shadow(color: Color(hex: "#F0A500").opacity(0.25), radius: 3, x: 0, y: 2)
+                    .shadow(color: palette.primary.opacity(0.25), radius: 3, x: 0, y: 2)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.tr("breakeven.api.saved"))
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color(hex: "#1E7E34"))
+                        .foregroundStyle(palette.deep)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color(hex: "#E8F8EC")))
+                        .background(Capsule().fill(palette.softBg))
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(formatUSDCompact(saved))
                             .font(.system(size: 26, weight: .bold))
-                            .foregroundStyle(Color(hex: "#1E7E34"))
+                            .foregroundStyle(palette.deep)
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -765,7 +770,7 @@ struct BreakevenView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "#F2FAF4"))
+                    .fill(palette.softBg)
             )
         }
         .padding(18)
@@ -861,6 +866,87 @@ private struct BreakevenStats {
     let totalEquivalentUSD: Double
     let ratio: Double
     let timeline: [TimelineEvent]
+    let palette: BreakevenPalette
+}
+
+/// 回本页主题色板：按订阅 provider 切换。
+/// - OpenAI 走灰白色调（呼应官方深灰 / 极简风）。
+/// - Anthropic 走橙色调（呼应官方暖橙 / 黏土风）。
+/// - 其他保留原绿色调，作为通用回退。
+private struct BreakevenPalette {
+    /// 深色：用于强调数字、标题、图标主色
+    let deep: Color
+    /// 主色：用于按钮、徽章主色调（一般和 deep 一致或略亮）
+    let primary: Color
+    /// 次级文字色（在浅背景上）
+    let onSoft: Color
+    /// 极浅背景：用于 chip、过滤背景、节省横幅底
+    let softBg: Color
+    /// chip 描边色
+    let softBorder: Color
+    /// 进度条轨道色（淡色）
+    let trackBg: Color
+    /// hero 卡片背景渐变（达标）
+    let heroDoneGradient: [Color]
+    /// hero 卡片背景渐变（未达标）
+    let heroAlmostGradient: [Color]
+    /// 箭头进度条渐变
+    let arrowGradient: [Color]
+    /// 时间线非当前节点的图标色（柔和版 primary）
+    let timelineSoft: Color
+
+    static func palette(for provider: Provider?) -> BreakevenPalette {
+        switch provider {
+        case .openai:
+            return BreakevenPalette(
+                deep: Color(hex: "#1F1F1F"),
+                primary: Color(hex: "#3C3C3C"),
+                onSoft: Color(hex: "#5A5A5A"),
+                softBg: Color(hex: "#F4F4F5"),
+                softBorder: Color(hex: "#D4D4D8"),
+                trackBg: Color(hex: "#ECECEE"),
+                heroDoneGradient: [Color(hex: "#F2F2F3"), Color(hex: "#FAFAFB")],
+                heroAlmostGradient: [Color(hex: "#EDEEF0"), Color(hex: "#F7F8FA")],
+                arrowGradient: [
+                    Color(hex: "#E5E5E7"), Color(hex: "#BDBDC2"),
+                    Color(hex: "#6E6E73"), Color(hex: "#2C2C2E")
+                ],
+                timelineSoft: Color(hex: "#A1A1A6")
+            )
+        case .anthropic:
+            return BreakevenPalette(
+                deep: Color(hex: "#B4480E"),
+                primary: Color(hex: "#D97706"),
+                onSoft: Color(hex: "#7A4419"),
+                softBg: Color(hex: "#FFF1E0"),
+                softBorder: Color(hex: "#F4C68A"),
+                trackBg: Color(hex: "#FBE9D3"),
+                heroDoneGradient: [Color(hex: "#FFE4C4"), Color(hex: "#FFF5E6"),],
+                heroAlmostGradient: [Color(hex: "#FFEAD1"), Color(hex: "#FFF8EE"),],
+                arrowGradient: [
+                    Color(hex: "#FCE2BE"), Color(hex: "#F4B16A"),
+                    Color(hex: "#E78A2F"), Color(hex: "#C9620E")
+                ],
+                timelineSoft: Color(hex: "#F1B179")
+            )
+        default:
+            return BreakevenPalette(
+                deep: Color(hex: "#1E7E34"),
+                primary: Color(hex: "#10A37F"),
+                onSoft: Color(hex: "#3E6B49"),
+                softBg: Color(hex: "#E8F8EC"),
+                softBorder: Color(hex: "#A6E1B4"),
+                trackBg: Color(hex: "#EAF5EE"),
+                heroDoneGradient: [Color(hex: "#E8F8EC"), Color(hex: "#F5FBF1")],
+                heroAlmostGradient: [Color(hex: "#FFF7E6"), Color(hex: "#FFFBF0")],
+                arrowGradient: [
+                    Color(hex: "#D6F1DF"), Color(hex: "#8BDBA4"),
+                    Color(hex: "#49BC76"), Color(hex: "#27A157")
+                ],
+                timelineSoft: Color(hex: "#7DD896")
+            )
+        }
+    }
 }
 
 private struct TimelineEvent {

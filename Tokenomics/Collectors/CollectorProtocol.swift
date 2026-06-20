@@ -25,23 +25,8 @@ enum CollectorRegistry {
     static func makeAll(keychain: KeychainService) -> [UsageCollector] {
         return [
             ClaudeCodeCollector(),
-            CursorCollector(),
-            TraeSoloCollector(),
-            QoderCollector(),
             OpenAIAPICollector(keychain: keychain),
-            AnthropicAPICollector(keychain: keychain),
-            DeepSeekCollector(keychain: keychain),
-            GeminiAPICollector(keychain: keychain),
-            QwenCollector(keychain: keychain, region: .china),
-            QwenCollector(keychain: keychain, region: .international),
-            SiliconFlowCollector(keychain: keychain),
-            OpenRouterCollector(keychain: keychain),
-            StepFunCollector(keychain: keychain),
-            MimoCollector(keychain: keychain),
-            KimiCollector(keychain: keychain),
-            MiniMaxCollector(keychain: keychain),
-            GLMCollector(keychain: keychain),
-            VolcengineCollector(keychain: keychain)
+            AnthropicAPICollector(keychain: keychain)
         ]
     }
 }

@@ -51,16 +51,4 @@ final class KeychainService {
 enum KeychainKey {
     static let openai     = "api.openai"
     static let anthropic  = "api.anthropic"
-    static let deepseek   = "api.deepseek"
-    static let gemini     = "api.gemini"
-    static let qwen       = "api.qwen"
-    static let qwenIntl   = "api.qwen.intl"
-    static let siliconflow = "api.siliconflow"
-    static let openrouter = "api.openrouter"
-    static let stepfun    = "api.stepfun"
-    static let mimo       = "api.mimo"
-    static let kimi       = "api.kimi"
-    static let glm        = "api.glm"
-    static let volcengine = "api.volcengine"
-    static let minimax    = "api.minimax"
 }

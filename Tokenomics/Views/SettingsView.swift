@@ -61,19 +61,7 @@ private struct APIKeysSettings: View {
     private var entries: [(provider: String, label: String, key: String, hint: String)] {
         [
             (Provider.openai.rawValue,      "OpenAI Admin Key",         KeychainKey.openai,     L10n.tr("apikey.hint.openai")),
-            (Provider.anthropic.rawValue,   "Anthropic Admin Key",      KeychainKey.anthropic,  L10n.tr("apikey.hint.anthropic")),
-            (Provider.deepseek.rawValue,    "DeepSeek API Key",         KeychainKey.deepseek,   L10n.tr("apikey.hint.deepseek")),
-            (Provider.google.rawValue,      "Gemini API Key",           KeychainKey.gemini,     L10n.tr("apikey.hint.gemini")),
-            (Provider.qwen.rawValue,        L10n.tr("apikey.label.qwen"), KeychainKey.qwen,     L10n.tr("apikey.hint.qwen")),
-            (Provider.qwenIntl.rawValue,    "Qwen (International) Key", KeychainKey.qwenIntl,   L10n.tr("apikey.hint.qwenIntl")),
-            (Provider.siliconflow.rawValue, "SiliconFlow Key",          KeychainKey.siliconflow, L10n.tr("apikey.hint.siliconflow")),
-            (Provider.openrouter.rawValue,  "OpenRouter Key",           KeychainKey.openrouter, L10n.tr("apikey.hint.openrouter")),
-            (Provider.stepfun.rawValue,     "Stepfun API Key",          KeychainKey.stepfun,    L10n.tr("apikey.hint.stepfun")),
-            (Provider.mimo.rawValue,        L10n.tr("apikey.label.mimo"), KeychainKey.mimo,     L10n.tr("apikey.hint.mimo")),
-            (Provider.kimi.rawValue,        "Kimi (Moonshot) API Key",  KeychainKey.kimi,       L10n.tr("apikey.hint.kimi")),
-            (Provider.minimax.rawValue,     L10n.tr("apikey.label.minimax"), KeychainKey.minimax, L10n.tr("apikey.hint.minimax")),
-            (Provider.glm.rawValue,         L10n.tr("apikey.label.glm"), KeychainKey.glm,       L10n.tr("apikey.hint.glm")),
-            (Provider.volcengine.rawValue,  L10n.tr("apikey.label.volcengine"), KeychainKey.volcengine, L10n.tr("apikey.hint.volcengine"))
+            (Provider.anthropic.rawValue,   "Anthropic Admin Key",      KeychainKey.anthropic,  L10n.tr("apikey.hint.anthropic"))
         ]
     }
 

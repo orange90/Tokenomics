@@ -76,21 +76,6 @@ enum LocalizationData_en {
         // MARK: - Provider display names
         "provider.anthropic":   "Anthropic",
         "provider.openai":      "OpenAI",
-        "provider.google":      "Google Gemini",
-        "provider.deepseek":    "DeepSeek",
-        "provider.qwen":        "Qwen (China)",
-        "provider.qwenIntl":    "Qwen (International)",
-        "provider.siliconflow": "SiliconFlow",
-        "provider.openrouter":  "OpenRouter",
-        "provider.stepfun":     "Stepfun",
-        "provider.mimo":        "Xiaomi MiMo",
-        "provider.kimi":        "Kimi (Moonshot)",
-        "provider.glm":         "Zhipu GLM",
-        "provider.minimax":     "MiniMax (Hailuo)",
-        "provider.cursor":      "Cursor",
-        "provider.traeSolo":    "TRAE Solo",
-        "provider.qoder":       "Qoder",
-        "provider.volcengine":  "Volcengine Ark (Doubao)",
         "provider.unknown":     "Unknown",
 
         // MARK: - Pricing
@@ -155,7 +140,7 @@ enum LocalizationData_en {
 
         // MARK: - Subscriptions
         "subs.title": "Subscriptions",
-        "subs.desc": "Add your subscriptions like ChatGPT Plus / Claude Pro / Cursor Pro to calculate break-even on the Break-even page.",
+        "subs.desc": "Add your subscriptions like ChatGPT Plus / Claude Pro to calculate break-even on the Break-even page.",
         "subs.empty.title": "No subscriptions yet",
         "subs.empty.desc": "Click Add at the top right to pick from presets, or customize your own monthly fee.",
         "subs.monthly.fmt": "$%.2f / mo",
@@ -194,7 +179,7 @@ enum LocalizationData_en {
         "dashboard.section.by_provider": "By Provider (This Month)",
         "dashboard.section.recent": "Latest 30 Records",
         "dashboard.empty.title": "No data",
-        "dashboard.empty.desc": "Configure an API Key in Settings, or make sure Claude Code/Cursor has produced logs on this machine.",
+        "dashboard.empty.desc": "Configure an API Key in Settings, or make sure Claude Code has produced logs on this machine.",
         "dashboard.cost.today": "Today",
         "dashboard.cost.week": "This Week",
         "dashboard.cost.month": "This Month",
@@ -291,7 +276,7 @@ enum LocalizationData_en {
         "breakeven.tip.done.fmt": "Keep it up! You're fully leveraging the %@ plan ✨",
         "breakeven.tip.almost": "Use it a bit more — you're almost at break-even 💪",
         "breakeven.empty.title": "No subscriptions yet",
-        "breakeven.empty.desc": "Add subscriptions like ChatGPT Plus / Claude Pro / Cursor Pro under Settings → Subscriptions.\nIf you're signed in to Claude Code / Codex CLI, head to Dashboard and wait a few seconds — subscriptions are auto-detected.",
+        "breakeven.empty.desc": "Add subscriptions like ChatGPT Plus / Claude Pro under Settings → Subscriptions.\nIf you're signed in to Claude Code / Codex CLI, head to Dashboard and wait a few seconds — subscriptions are auto-detected.",
 
         // MARK: - Probe results
         "probe.ok.fmt": "✓ Got sessionKey from %@/%@ (…%@), host=%@",
@@ -299,25 +284,8 @@ enum LocalizationData_en {
         "quota.probe.success.fmt": "Got sessionKey from %@/%@ (…%@), host=%@",
 
         // MARK: - API Key labels & hints
-        "apikey.label.qwen":       "Qwen (China) API Key",
-        "apikey.label.mimo":       "Xiaomi MiMo API Key",
-        "apikey.label.minimax":    "MiniMax (Hailuo) API Key",
-        "apikey.label.glm":        "Zhipu GLM API Key",
-        "apikey.label.volcengine": "Volcengine Ark API Key",
         "apikey.hint.openai":      "Pulls cost data from api.openai.com /v1/organization/costs",
         "apikey.hint.anthropic":   "Pulls usage data from api.anthropic.com /v1/organizations/usage_report",
-        "apikey.hint.deepseek":    "Pulls /user/balance (no usage breakdown yet)",
-        "apikey.hint.gemini":      "Currently used for verification only; pricing is computed locally",
-        "apikey.hint.qwen":        "Used for verification & charge breakdown (DashScope console keys)",
-        "apikey.hint.qwenIntl":    "International endpoint dashscope-intl.aliyuncs.com",
-        "apikey.hint.siliconflow": "Pulls /user/info balance from api.siliconflow.cn",
-        "apikey.hint.openrouter":  "Pulls /api/v1/credits balance from openrouter.ai",
-        "apikey.hint.stepfun":     "Used for verification (Stepfun open platform)",
-        "apikey.hint.mimo":        "Used for verification (Xiaomi MiMo open platform)",
-        "apikey.hint.kimi":        "Used for verification (Moonshot platform)",
-        "apikey.hint.minimax":     "Used for verification (MiniMax open platform)",
-        "apikey.hint.glm":         "Used for verification (Zhipu BigModel platform)",
-        "apikey.hint.volcengine":  "Used for verification (Volcengine Ark / Doubao platform)",
 
         // MARK: - ChromiumBrowser errors
         "browser.not_installed.fmt": "%@ not installed",

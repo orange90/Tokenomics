@@ -50,18 +50,7 @@ struct SubscriptionPreset: Identifiable, Hashable {
               planName: "Claude Max 5x", monthlyUSD: 100),
         .init(id: "claude-max-20x", providerKey: Provider.anthropic.rawValue,
               providerDisplayName: Provider.anthropic.displayName,
-              planName: "Claude Max 20x", monthlyUSD: 200),
-        // Cursor
-        .init(id: "cursor-pro", providerKey: Provider.cursor.rawValue,
-              providerDisplayName: Provider.cursor.displayName,
-              planName: "Cursor Pro", monthlyUSD: 20),
-        .init(id: "cursor-business", providerKey: Provider.cursor.rawValue,
-              providerDisplayName: Provider.cursor.displayName,
-              planName: "Cursor Business", monthlyUSD: 40),
-        // Google Gemini
-        .init(id: "gemini-advanced", providerKey: Provider.google.rawValue,
-              providerDisplayName: Provider.google.displayName,
-              planName: "Gemini Advanced", monthlyUSD: 20)
+              planName: "Claude Max 20x", monthlyUSD: 200)
     ]
 
     /// 根据 quota probe 的 id（"claude" / "codex"）和 accountIdentifier

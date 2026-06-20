@@ -76,21 +76,6 @@ enum LocalizationData_zhHant {
         // MARK: - Provider display names
         "provider.anthropic":   "Anthropic",
         "provider.openai":      "OpenAI",
-        "provider.google":      "Google Gemini",
-        "provider.deepseek":    "DeepSeek",
-        "provider.qwen":        "通義千問 (中國)",
-        "provider.qwenIntl":    "Qwen (International)",
-        "provider.siliconflow": "矽基流動",
-        "provider.openrouter":  "OpenRouter",
-        "provider.stepfun":     "階躍星辰 (Stepfun)",
-        "provider.mimo":        "小米 MiMo",
-        "provider.kimi":        "Kimi (Moonshot)",
-        "provider.glm":         "智譜 GLM",
-        "provider.minimax":     "MiniMax (海螺)",
-        "provider.cursor":      "Cursor",
-        "provider.traeSolo":    "TRAE Solo",
-        "provider.qoder":       "Qoder",
-        "provider.volcengine":  "火山方舟 (豆包)",
         "provider.unknown":     "未知",
 
         // MARK: - Pricing
@@ -155,7 +140,7 @@ enum LocalizationData_zhHant {
 
         // MARK: - Subscriptions
         "subs.title": "訂閱套餐",
-        "subs.desc": "新增你已訂閱的 ChatGPT Plus / Claude Pro / Cursor Pro 等，用來在「回本沒」頁面計算回本率。",
+        "subs.desc": "新增你已訂閱的 ChatGPT Plus / Claude Pro 等，用來在「回本沒」頁面計算回本率。",
         "subs.empty.title": "還沒有訂閱記錄",
         "subs.empty.desc": "點擊右上角「新增」從預設套餐裡挑選，或自訂月費。",
         "subs.monthly.fmt": "$%.2f / 月",
@@ -194,7 +179,7 @@ enum LocalizationData_zhHant {
         "dashboard.section.by_provider": "按供應商彙總（本月）",
         "dashboard.section.recent": "最近 30 條明細",
         "dashboard.empty.title": "暫無資料",
-        "dashboard.empty.desc": "請在「設定」中設定 API Key，或確保 Claude Code/Cursor 已在本機產生過日誌。",
+        "dashboard.empty.desc": "請在「設定」中設定 API Key，或確保 Claude Code 已在本機產生過日誌。",
         "dashboard.cost.today": "今日",
         "dashboard.cost.week": "本週",
         "dashboard.cost.month": "本月",
@@ -291,7 +276,7 @@ enum LocalizationData_zhHant {
         "breakeven.tip.done.fmt": "繼續保持！你正在充分利用 %@ 套餐的強大能力 ✨",
         "breakeven.tip.almost": "再多用一些，距離回本只差一點啦 💪",
         "breakeven.empty.title": "還沒新增任何訂閱",
-        "breakeven.empty.desc": "請到「設定 → 訂閱」中新增你訂閱的 ChatGPT Plus / Claude Pro / Cursor Pro 等套餐。\n如果你登入了 Claude Code / Codex CLI，回到「儀表板」等幾秒，訂閱會被自動識別。",
+        "breakeven.empty.desc": "請到「設定 → 訂閱」中新增你訂閱的 ChatGPT Plus / Claude Pro 等套餐。\n如果你登入了 Claude Code / Codex CLI，回到「儀表板」等幾秒，訂閱會被自動識別。",
 
         // MARK: - Probe results
         "probe.ok.fmt": "✓ 已從 %@/%@ 讀到 sessionKey（…%@），host=%@",
@@ -299,25 +284,8 @@ enum LocalizationData_zhHant {
         "quota.probe.success.fmt": "已從 %@/%@ 讀到 sessionKey（…%@），host=%@",
 
         // MARK: - API Key 標籤 & 說明
-        "apikey.label.qwen":       "通義千問 API Key",
-        "apikey.label.mimo":       "小米 MiMo API Key",
-        "apikey.label.minimax":    "MiniMax 海螺 API Key",
-        "apikey.label.glm":        "智譜 GLM API Key",
-        "apikey.label.volcengine": "火山方舟 API Key",
         "apikey.hint.openai":      "從 api.openai.com 拉取 /v1/organization/costs 費用資料",
         "apikey.hint.anthropic":   "從 api.anthropic.com 拉取 /v1/organizations/usage_report 使用資料",
-        "apikey.hint.deepseek":    "拉取 /user/balance 餘額（暫無使用量明細接口）",
-        "apikey.hint.gemini":      "目前僅用於鑑權校驗；用量與價格在本機計算",
-        "apikey.hint.qwen":        "用於鑑權與計費明細（DashScope 控制台金鑰）",
-        "apikey.hint.qwenIntl":    "國際版接入點 dashscope-intl.aliyuncs.com",
-        "apikey.hint.siliconflow": "從 api.siliconflow.cn 拉取 /user/info 餘額",
-        "apikey.hint.openrouter":  "從 openrouter.ai 拉取 /api/v1/credits 餘額",
-        "apikey.hint.stepfun":     "用於鑑權校驗（階躍星辰開放平台）",
-        "apikey.hint.mimo":        "用於鑑權校驗（小米 MiMo 開放平台）",
-        "apikey.hint.kimi":        "用於鑑權校驗（Moonshot 平台）",
-        "apikey.hint.minimax":     "用於鑑權校驗（MiniMax 開放平台）",
-        "apikey.hint.glm":         "用於鑑權校驗（智譜 BigModel 平台）",
-        "apikey.hint.volcengine":  "用於鑑權校驗（火山方舟 / 豆包平台）",
 
         // MARK: - ChromiumBrowser errors
         "browser.not_installed.fmt": "%@ 未安裝",

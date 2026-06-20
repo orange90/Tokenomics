@@ -71,6 +71,7 @@ final class RefreshScheduler {
                         input: rec.inputTokens,
                         output: rec.outputTokens,
                         cacheCreation: rec.cacheCreationTokens,
+                        cacheCreation1h: rec.cacheCreation1hTokens,
                         cacheRead: rec.cacheReadTokens
                     )
                 }

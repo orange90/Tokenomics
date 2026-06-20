@@ -93,6 +93,13 @@ final class ClaudeCodeCollector: UsageCollector {
         let output = (usage["output_tokens"] as? Int) ?? 0
         let cw = (usage["cache_creation_input_tokens"] as? Int) ?? 0
         let cr = (usage["cache_read_input_tokens"] as? Int) ?? 0
+        // 1 小时 TTL 缓存写入：嵌套在 usage.cache_creation.ephemeral_1h_input_tokens。
+        // 它是 cache_creation_input_tokens 的子集，需要单独按 2× 输入价计费。
+        let cw1h: Int = {
+            guard let cc = usage["cache_creation"] as? [String: Any] else { return 0 }
+            let v = (cc["ephemeral_1h_input_tokens"] as? Int) ?? 0
+            return min(max(0, v), cw)
+        }()
 
         if input == 0 && output == 0 && cw == 0 && cr == 0 { return nil }
 
@@ -104,6 +111,7 @@ final class ClaudeCodeCollector: UsageCollector {
             inputTokens: input,
             outputTokens: output,
             cacheCreationTokens: cw,
+            cacheCreation1hTokens: cw1h,
             cacheReadTokens: cr,
             requestId: requestId
         )

@@ -69,7 +69,7 @@ final class PricingService {
         return nil
     }
 
-    func cost(provider: String, model: String, input: Int, output: Int, cacheCreation: Int = 0, cacheRead: Int = 0) -> Double {
+    func cost(provider: String, model: String, input: Int, output: Int, cacheCreation: Int = 0, cacheCreation1h: Int = 0, cacheRead: Int = 0) -> Double {
         guard let p = pricing(for: provider, model: model) else {
             if input > 0 || output > 0 || cacheCreation > 0 || cacheRead > 0 {
                 let key = "\(provider):\(model)"
@@ -79,7 +79,7 @@ final class PricingService {
             }
             return 0
         }
-        return p.cost(inputTokens: input, outputTokens: output, cacheCreation: cacheCreation, cacheRead: cacheRead)
+        return p.cost(inputTokens: input, outputTokens: output, cacheCreation: cacheCreation, cacheCreation1h: cacheCreation1h, cacheRead: cacheRead)
     }
 
     var allEntries: [ModelPricing] {

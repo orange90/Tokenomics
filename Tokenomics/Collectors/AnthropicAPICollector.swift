@@ -40,6 +40,12 @@ final class AnthropicAPICollector: UsageCollector {
                 let output = (r["output_tokens"] as? Int) ?? 0
                 let cw = (r["cache_creation_input_tokens"] as? Int) ?? 0
                 let cr = (r["cache_read_input_tokens"] as? Int) ?? 0
+                // 1h 缓存写入：Admin usage report 可能在 cache_creation.ephemeral_1h_input_tokens 给出明细。
+                let cw1h: Int = {
+                    guard let cc = r["cache_creation"] as? [String: Any] else { return 0 }
+                    let v = (cc["ephemeral_1h_input_tokens"] as? Int) ?? 0
+                    return min(max(0, v), cw)
+                }()
                 if input == 0 && output == 0 && cw == 0 && cr == 0 { continue }
                 records.append(UsageRecord(
                     timestamp: ts,
@@ -49,6 +55,7 @@ final class AnthropicAPICollector: UsageCollector {
                     inputTokens: input,
                     outputTokens: output,
                     cacheCreationTokens: cw,
+                    cacheCreation1hTokens: cw1h,
                     cacheReadTokens: cr
                 ))
             }

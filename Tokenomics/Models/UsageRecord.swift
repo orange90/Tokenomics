@@ -11,6 +11,9 @@ final class UsageRecord {
     var inputTokens: Int
     var outputTokens: Int
     var cacheCreationTokens: Int
+    /// cacheCreationTokens 中属于「1 小时 TTL」缓存写入的部分（是 cacheCreationTokens 的子集，不额外计入 totalTokens）。
+    /// Anthropic 对 1h 缓存写入按 2× 输入价计费，5 分钟缓存按 1.25× 输入价；二者必须分别计价。
+    var cacheCreation1hTokens: Int = 0
     var cacheReadTokens: Int
     var costUSD: Double
     var requestId: String?
@@ -26,6 +29,7 @@ final class UsageRecord {
         inputTokens: Int,
         outputTokens: Int,
         cacheCreationTokens: Int = 0,
+        cacheCreation1hTokens: Int = 0,
         cacheReadTokens: Int = 0,
         costUSD: Double = 0,
         requestId: String? = nil
@@ -38,6 +42,7 @@ final class UsageRecord {
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
         self.cacheCreationTokens = cacheCreationTokens
+        self.cacheCreation1hTokens = min(max(0, cacheCreation1hTokens), max(0, cacheCreationTokens))
         self.cacheReadTokens = cacheReadTokens
         self.costUSD = costUSD
         self.requestId = requestId

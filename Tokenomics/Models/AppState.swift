@@ -71,6 +71,8 @@ final class AppState: ObservableObject {
     @AppStorage("tc.preferredAppearance") private var preferredAppearanceRaw: String = AppearanceMode.system.rawValue
     @AppStorage("tc.subscriptions") private var subscriptionsRaw: String = ""
     @AppStorage("tc.claudeQuotaPrefs") private var claudeQuotaPrefsRaw: String = ""
+    /// 一次性迁移标志：是否已为「1 小时缓存计价修正」清理并重解析过 Claude Code 历史。
+    @AppStorage("tc.claude1hCacheMigrated") private var claude1hCacheMigrated: Bool = false
 
     func bootstrap(modelContext: ModelContext) async {
         // 1. 读取偏好
@@ -133,6 +135,16 @@ final class AppState: ObservableObject {
         let migrated = repo.migrateClaudeCodeIfNeeded()
         if migrated > 0 {
             appendStatus("⟳ 迁移：清理被旧 normalize 截断的 \(migrated) 条 Claude Code 记录，将全量重新解析")
+        }
+
+        // 5.2 一次性迁移：旧版本未解析 1 小时缓存写入，费用被低估。
+        //     清理 Claude Code 历史并重解析，按 2× 输入价正确计入 1h 缓存。
+        if !claude1hCacheMigrated {
+            let reset = repo.resetClaudeCodeRecordsForReparse()
+            claude1hCacheMigrated = true
+            if reset > 0 {
+                appendStatus("⟳ 迁移：1h 缓存计价修正，清理 \(reset) 条 Claude Code 记录，将全量重算费用")
+            }
         }
 
         await scheduler.start()

@@ -141,6 +141,7 @@ final class UsageRepository {
                 input: r.inputTokens,
                 output: r.outputTokens,
                 cacheCreation: r.cacheCreationTokens,
+                cacheCreation1h: r.cacheCreation1hTokens,
                 cacheRead: r.cacheReadTokens
             )
             if c > 0 {
@@ -178,6 +179,30 @@ final class UsageRepository {
         let count = claudeRecords.count
         for r in claudeRecords { context.delete(r) }
         // 同步清空 ClaudeCode collector 的游标，让下次 refresh 全量重解析
+        var stateFd = FetchDescriptor<CollectorState>(predicate: #Predicate { $0.collectorId == "claude-code" })
+        stateFd.fetchLimit = 1
+        if let st = try? context.fetch(stateFd).first {
+            st.lastRunAt = nil
+            st.cursorPayload = nil
+            st.lastError = nil
+        }
+        try? context.save()
+        return count
+    }
+
+    /// 一次性迁移：旧版本未解析 1 小时缓存写入（usage.cache_creation.ephemeral_1h_input_tokens），
+    /// 导致 Claude Code 的缓存写入全部按 5 分钟价计费，费用被系统性低估。
+    /// 这里删除全部 Claude Code 历史记录并清空其游标，让下一轮 refresh 全量重解析，
+    /// 重新带上 1h token 字段并按 2× 输入价正确计费。由调用方用一次性标志位 gate。
+    ///
+    /// 返回被清理掉的记录条数。
+    @discardableResult
+    func resetClaudeCodeRecordsForReparse() -> Int {
+        let app = "Claude Code"
+        let fd = FetchDescriptor<UsageRecord>(predicate: #Predicate { $0.sourceApp == app })
+        guard let records = try? context.fetch(fd) else { return 0 }
+        let count = records.count
+        for r in records { context.delete(r) }
         var stateFd = FetchDescriptor<CollectorState>(predicate: #Predicate { $0.collectorId == "claude-code" })
         stateFd.fetchLimit = 1
         if let st = try? context.fetch(stateFd).first {

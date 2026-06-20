@@ -123,8 +123,8 @@ final class AppState: ObservableObject {
                     self?.appendStatus(msg)
                 }
             },
-            onCycleComplete: { [weak self] in
-                await self?.refreshQuotas()
+            onCycleComplete: { [weak self] forced in
+                await self?.refreshQuotas(force: forced)
             }
         )
         self.scheduler = scheduler
@@ -161,8 +161,8 @@ final class AppState: ObservableObject {
             onLog: { [weak self] msg in
                 Task { @MainActor in self?.appendStatus(msg) }
             },
-            onCycleComplete: { [weak self] in
-                await self?.refreshQuotas()
+            onCycleComplete: { [weak self] forced in
+                await self?.refreshQuotas(force: forced)
             }
         )
         self.scheduler = newScheduler
@@ -322,17 +322,28 @@ final class AppState: ObservableObject {
         guard let scheduler else { return }
         isRefreshing = true
         Task {
-            // refreshNow() 完成后会触发 onCycleComplete，从而拉取额度。
-            await scheduler.refreshNow()
+            // 手动刷新强制拉额度（forced=true），绕过 30 分钟限流。
+            await scheduler.refreshNow(forced: true)
             self.lastRefreshAt = Date()
             self.isRefreshing = false
         }
     }
 
+    /// 额度拉取的最小间隔。额度不需要 5 分钟粒度，拉太勤只会徒增网络/钥匙串开销。
+    /// 定时轮询按此限流；用户手动刷新（force=true）不受限。
+    private let quotaRefreshInterval: TimeInterval = 1800
+    private var lastQuotaRefreshAt: Date?
+
     /// 拉取 Claude / Codex 订阅额度快照。失败的 probe 会在状态栏打印一条日志。
-    func refreshQuotas() async {
+    /// - Parameter force: true 时忽略 `quotaRefreshInterval` 限流（手动刷新用）。
+    func refreshQuotas(force: Bool = false) async {
+        if !force, let last = lastQuotaRefreshAt,
+           Date().timeIntervalSince(last) < quotaRefreshInterval {
+            return
+        }
         let available = quotaService.availableProbes
         guard !available.isEmpty else { return }
+        lastQuotaRefreshAt = Date()
         appendStatus("开始拉取订阅额度 (probes=\(available.count))")
         let result = await quotaService.fetchAll()
         for (pid, snap) in result.snapshots {

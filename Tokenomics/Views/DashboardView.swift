@@ -17,7 +17,13 @@ struct DashboardView: View {
                         let cols = quotaColumns
                         LazyVGrid(columns: cols, spacing: 12) {
                             ForEach(quotaCards, id: \.snapshot.id) { item in
-                                QuotaCard(snapshot: item.snapshot, accent: item.accent)
+                                QuotaCard(
+                                    snapshot: item.snapshot,
+                                    accent: item.accent,
+                                    usage: planUsage(for: item.snapshot.id),
+                                    currency: appState.currency,
+                                    usdCnyRate: appState.usdCnyRate
+                                )
                             }
                         }
                     }
@@ -253,6 +259,49 @@ struct DashboardView: View {
         case "codex":  return Color(hex: Provider.openai.brandColorHex)
         default:       return .accentColor
         }
+    }
+
+    /// 把额度探针 id 映射到 UsageRecord.provider 字段，用于按 Plan 聚合真实用量。
+    /// 未识别的 probe 返回 nil，对应卡片只显示零值。
+    private func providerKey(forProbeID probeID: String) -> String? {
+        switch probeID {
+        case "claude": return Provider.anthropic.rawValue
+        case "codex":  return Provider.openai.rawValue
+        default:       return nil
+        }
+    }
+
+    /// 计算某个 Plan（按 probe id 区分）在今日 / 近 7 天 / 近 30 天的用量。
+    /// 时间窗口以「日历自然日」为基准：今日=startOfDay(now)，
+    /// 近 7 天 = startOfDay(now) - 6 天起到现在，近 30 天同理 - 29 天。
+    private func planUsage(for probeID: String) -> PlanUsageStats {
+        guard let key = providerKey(forProbeID: probeID) else { return .zero }
+        let cal = Calendar.current
+        let startOfToday = cal.startOfDay(for: Date())
+        let week  = cal.date(byAdding: .day, value: -6,  to: startOfToday) ?? startOfToday
+        let month = cal.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
+
+        var todayCost = 0.0, todayTokens = 0
+        var weekCost  = 0.0, weekTokens  = 0
+        var monthCost = 0.0, monthTokens = 0
+        for r in records where r.provider == key {
+            if r.timestamp < month { continue }
+            monthCost += r.costUSD
+            monthTokens += r.totalTokens
+            if r.timestamp >= week {
+                weekCost += r.costUSD
+                weekTokens += r.totalTokens
+            }
+            if r.timestamp >= startOfToday {
+                todayCost += r.costUSD
+                todayTokens += r.totalTokens
+            }
+        }
+        return PlanUsageStats(
+            todayCostUSD: todayCost, todayTokens: todayTokens,
+            weekCostUSD: weekCost, weekTokens: weekTokens,
+            monthCostUSD: monthCost, monthTokens: monthTokens
+        )
     }
 }
 

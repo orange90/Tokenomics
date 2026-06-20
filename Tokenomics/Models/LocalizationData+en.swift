@@ -226,6 +226,11 @@ enum LocalizationData_en {
         "quotacard.empty": "No quota windows to display",
         "quotacard.updated.fmt": "Updated %@ · %@",
         "quotacard.reset.fmt": "Resets %@",
+        "quotacard.usage.title": "Usage",
+        "quotacard.usage.today": "Today",
+        "quotacard.usage.week": "Last 7 days",
+        "quotacard.usage.month": "Last 30 days",
+        "quotacard.usage.tokens.fmt": "%@ tokens",
 
         // MARK: - Provider row / Cost card / Usage chart
         "providerrow.subtitle.fmt": "%d records · %@ tokens",

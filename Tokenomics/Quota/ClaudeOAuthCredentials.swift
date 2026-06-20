@@ -63,6 +63,12 @@ final class ClaudeOAuthCredentialStore {
         self.fileURL = fileURL ?? home.appendingPathComponent(".claude/.credentials.json")
     }
 
+    /// 进程内凭证缓存。读 Keychain 属跨进程操作、且对别家（Claude CLI）的条目会走 ACL
+    /// 校验/弹窗，没必要每轮额度刷新都来一次。首次读后缓存；refresh 写回时更新；
+    /// refresh 因 token 被外部轮换而失败时失效重读。
+    private var cached: Loaded?
+    private let cacheLock = NSLock()
+
     // MARK: - Availability
 
     /// 是否存在凭证。注意：不读取 Keychain 数据，避免触发授权弹窗。
@@ -93,6 +99,18 @@ final class ClaudeOAuthCredentialStore {
     }
 
     func load() throws -> Loaded {
+        cacheLock.lock()
+        let hit = cached
+        cacheLock.unlock()
+        if let hit { return hit }
+
+        let loaded = try loadFromSource()
+        store(loaded)
+        return loaded
+    }
+
+    /// 跳过缓存，强制从来源（Keychain / 文件）重新读取。
+    private func loadFromSource() throws -> Loaded {
         // 优先 Keychain（新版本 Claude Code 默认），回退到 ~/.claude/.credentials.json。
         if let data = try? readKeychainData() {
             return try parse(data: data, source: .keychain)
@@ -102,6 +120,14 @@ final class ClaudeOAuthCredentialStore {
             return try parse(data: data, source: .file(fileURL))
         }
         throw APIError.missingKey
+    }
+
+    private func store(_ loaded: Loaded) {
+        cacheLock.lock(); cached = loaded; cacheLock.unlock()
+    }
+
+    private func invalidateCache() {
+        cacheLock.lock(); cached = nil; cacheLock.unlock()
     }
 
     private func parse(data: Data, source: Source) throws -> Loaded {
@@ -148,7 +174,30 @@ final class ClaudeOAuthCredentialStore {
     // MARK: - Refresh
 
     /// 用 refresh token 换新 access token；成功后写回来源并返回新凭证。
+    ///
+    /// 加了缓存后要防一种情况：Claude CLI 可能在后台自己刷新并把 refresh token 轮换写回
+    /// Keychain，使我们缓存里的那个失效。若刷新因此报认证错（400/401/403），就失效缓存、
+    /// 重读来源；若来源里的 refresh token 确实已经换了，再用新值重试一次。
     func refresh(_ loaded: Loaded) async throws -> ClaudeOAuthCredentials {
+        do {
+            return try await performRefresh(loaded)
+        } catch let error where Self.isAuthError(error) {
+            invalidateCache()
+            guard let fresh = try? loadFromSource(),
+                  fresh.credentials.refreshToken != loaded.credentials.refreshToken else {
+                throw error
+            }
+            store(fresh)
+            return try await performRefresh(fresh)
+        }
+    }
+
+    private static func isAuthError(_ error: Error) -> Bool {
+        if case APIError.httpStatus(let code, _) = error, (400...403).contains(code) { return true }
+        return false
+    }
+
+    private func performRefresh(_ loaded: Loaded) async throws -> ClaudeOAuthCredentials {
         guard let refreshToken = loaded.credentials.refreshToken else {
             throw APIError.missingKey
         }
@@ -230,6 +279,14 @@ final class ClaudeOAuthCredentialStore {
         } else {
             root = inner
         }
+
+        // 先更新进程内缓存：下一轮 load() 直接拿到新 token，不必再读 Keychain。
+        // 与下面的写回相互独立——即便写回失败，内存里的新凭证仍然有效。
+        var updated = loaded
+        updated.credentials = creds
+        updated.root = root
+        store(updated)
+
         guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]) else { return }
 
         switch loaded.source {

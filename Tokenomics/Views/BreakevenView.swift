@@ -250,7 +250,8 @@ struct BreakevenView: View {
 
                     Spacer(minLength: 0)
 
-                    trophy
+                    TrophyIllustration()
+                        .frame(width: 120, height: 132)
                 }
 
                 // 三栏小数据
@@ -302,25 +303,6 @@ struct BreakevenView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.white.opacity(0.85))
         )
-    }
-
-    private var trophy: some View {
-        ZStack {
-            // 奖杯本体
-            Image(systemName: "trophy.fill")
-                .font(.system(size: 90))
-                .foregroundStyle(LinearGradient(
-                    colors: [Color(hex: "#FFD24A"), Color(hex: "#F0A500")],
-                    startPoint: .top, endPoint: .bottom
-                ))
-                .shadow(color: Color(hex: "#F0A500").opacity(0.4), radius: 10, x: 0, y: 4)
-            // 星星
-            Image(systemName: "star.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(Color.white)
-                .offset(y: -6)
-        }
-        .frame(width: 110, height: 110)
     }
 
     private var confetti: some View {
@@ -395,9 +377,8 @@ struct BreakevenView: View {
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color(hex: "#A0D9B4"))
+                    PeopleGroupIllustration()
+                        .frame(width: 46, height: 34)
                 }
                 Text(L10n.tr("breakeven.badge.users"))
                     .font(.system(size: 10))
@@ -411,67 +392,63 @@ struct BreakevenView: View {
 
     @ViewBuilder
     private func badgeIcon(tier: UserTier) -> some View {
-        ZStack {
-            // 盾牌底
-            ShieldShape()
-                .fill(LinearGradient(
-                    colors: [tier.color, tier.color.opacity(0.75)],
-                    startPoint: .top, endPoint: .bottom
-                ))
-                .shadow(color: tier.color.opacity(0.3), radius: 6, x: 0, y: 3)
-            ShieldShape()
-                .stroke(Color.white.opacity(0.6), lineWidth: 2)
-                .padding(4)
-
-            VStack(spacing: 4) {
-                Image(systemName: tier.iconName)
-                    .font(.system(size: 32))
-                    .foregroundStyle(.white)
-                Text(tier.title)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.black.opacity(0.15)))
-                HStack(spacing: 2) {
-                    ForEach(0..<tier.stars, id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 7))
-                            .foregroundStyle(Color(hex: "#FFD700"))
-                    }
-                }
-            }
-        }
+        TierBadgeIllustration(
+            title: tier.title,
+            stars: tier.stars,
+            iconName: tier.iconName,
+            iconColor: tier.color
+        )
     }
 
     private func userTier(ratio: Double) -> UserTier {
+        let pct = estimatedPercentile(ratio: ratio)
         switch ratio {
         case 5...:
             return UserTier(
                 title: L10n.tr("breakeven.tier.fire"), emoji: "🔥", iconName: "flame.fill",
-                color: Color(hex: "#E85D2A"), stars: 3, percentile: 92
+                color: Color(hex: "#E85D2A"), stars: 3, percentile: pct
             )
         case 3..<5:
             return UserTier(
                 title: L10n.tr("breakeven.tier.diamond"), emoji: "💎", iconName: "diamond.fill",
-                color: Color(hex: "#1E90FF"), stars: 3, percentile: 80
+                color: Color(hex: "#1E90FF"), stars: 3, percentile: pct
             )
         case 1..<3:
             return UserTier(
                 title: L10n.tr("breakeven.tier.done"), emoji: "✨", iconName: "checkmark.seal.fill",
-                color: Color(hex: "#10A37F"), stars: 2, percentile: 60
+                color: Color(hex: "#10A37F"), stars: 2, percentile: pct
             )
         case 0.5..<1:
             return UserTier(
                 title: L10n.tr("breakeven.tier.almost"), emoji: "🚀", iconName: "arrow.up.right",
-                color: Color(hex: "#F0A500"), stars: 2, percentile: 35
+                color: Color(hex: "#F0A500"), stars: 2, percentile: pct
             )
         default:
             return UserTier(
                 title: L10n.tr("breakeven.tier.newbie"), emoji: "🌱", iconName: "leaf.fill",
-                color: Color(hex: "#9CA3AF"), stars: 1, percentile: 15
+                color: Color(hex: "#9CA3AF"), stars: 1, percentile: pct
             )
         }
+    }
+
+    /// 基于对数正态先验估算"超过百分之多少用户"。
+    ///
+    /// 假设全体用户的 ratio 满足 ln(ratio) ~ N(μ, σ²)，先验取 μ=0、σ=1，
+    /// 即"中位数用户恰好回本（ratio=1）"，长尾向高倍率延伸：
+    ///   ratio = 1.00 → 50%（中位数）
+    ///   ratio = 2.72 (e¹) → 84%（+1σ）
+    ///   ratio = 7.39 (e²) → 97%（+2σ）
+    ///   ratio = 20.09 (e³) → 99%（+3σ）
+    /// 用标准正态 CDF Φ(z) = 0.5·(1 + erf(z/√2)) 实时换算，单调连续，
+    /// 不会因为 ratio 差 0.01 而跳档。结果裁到 [1, 99]。
+    private func estimatedPercentile(ratio: Double) -> Int {
+        guard ratio > 0 else { return 1 }
+        let muLn = 0.0
+        let sigmaLn = 1.0
+        let z = (log(ratio) - muLn) / sigmaLn
+        let cdf = 0.5 * (1.0 + erf(z / sqrt(2.0)))
+        let pct = Int((cdf * 100.0).rounded())
+        return max(1, min(99, pct))
     }
 
     // MARK: - Investment vs Return
@@ -523,38 +500,42 @@ struct BreakevenView: View {
 
             // 一体化的箭头进度条
             GeometryReader { geo in
-                let trackHeight: CGFloat = 28
-                let headWidth: CGFloat = 22
+                let arrowSpan: CGFloat = 40     // 含箭翼的最大高度
+                let bodyHeight: CGFloat = 24    // 杆身厚度
+                let headWidth: CGFloat = 42     // 箭头长度
                 let fraction = progressFraction(ratio: stats.ratio)
-                let bodyMin: CGFloat = 56
+                let bodyMin: CGFloat = 72
                 let totalWidth = max(bodyMin + headWidth, geo.size.width * fraction)
 
                 ZStack(alignment: .leading) {
-                    // 轨道
+                    // 轨道（与杆身等高居中）
                     Capsule()
                         .fill(Color(hex: "#EAF5EE"))
-                        .frame(height: trackHeight)
+                        .frame(height: bodyHeight)
 
-                    // 一体化箭头（圆角尾 + 尖头）
-                    ArrowBarShape(headWidth: headWidth, cornerRadius: trackHeight / 2)
+                    // 一体化箭头：圆角细杆 + 张开箭翼 + 修长尖锋；尾浅头深，呼应「投入少→回报多」
+                    ArrowBarShape(headWidth: headWidth, bodyRatio: bodyHeight / arrowSpan)
                         .fill(LinearGradient(
-                            colors: [Color(hex: "#7DD896"), Color(hex: "#3FB46A"), Color(hex: "#1E7E34")],
+                            colors: [
+                                Color(hex: "#D6F1DF"), Color(hex: "#8BDBA4"),
+                                Color(hex: "#49BC76"), Color(hex: "#27A157")
+                            ],
                             startPoint: .leading, endPoint: .trailing
                         ))
                         .overlay(
-                            // 顶部高光
-                            ArrowBarShape(headWidth: headWidth, cornerRadius: trackHeight / 2)
+                            // 上半镜面高光
+                            ArrowBarShape(headWidth: headWidth, bodyRatio: bodyHeight / arrowSpan)
                                 .fill(LinearGradient(
-                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0)],
+                                    colors: [Color.white.opacity(0.5), Color.white.opacity(0)],
                                     startPoint: .top, endPoint: .center
                                 ))
                                 .blendMode(.plusLighter)
                         )
-                        .frame(width: totalWidth, height: trackHeight)
-                        .shadow(color: Color(hex: "#2E9B4F").opacity(0.25), radius: 6, x: 0, y: 3)
+                        .frame(width: totalWidth, height: arrowSpan)
+                        .shadow(color: Color(hex: "#2E9B4F").opacity(0.30), radius: 7, x: 0, y: 4)
                 }
             }
-            .frame(height: 28)
+            .frame(height: 40)
             .padding(.top, 4)
         }
         .padding(20)
@@ -610,6 +591,13 @@ struct BreakevenView: View {
         .padding(20)
         .frame(minHeight: 220, alignment: .topLeading)
         .background(cardBackground)
+        .overlay(alignment: .bottomTrailing) {
+            RocketIllustration()
+                .frame(width: 66, height: 92)
+                .padding(.trailing, 14)
+                .padding(.bottom, 12)
+                .allowsHitTesting(false)
+        }
     }
 
     private func timelineDate(_ d: Date) -> String {
@@ -746,12 +734,9 @@ struct BreakevenView: View {
 
             // 底部：节省高亮，居中横幅
             HStack(spacing: 12) {
-                Image(systemName: "face.smiling.inverse")
-                    .font(.system(size: 32))
-                    .foregroundStyle(LinearGradient(
-                        colors: [Color(hex: "#FFD24A"), Color(hex: "#F0A500")],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                Text("😎")
+                    .font(.system(size: 34))
+                    .shadow(color: Color(hex: "#F0A500").opacity(0.25), radius: 3, x: 0, y: 2)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.tr("breakeven.api.saved"))
                         .font(.system(size: 11, weight: .medium))
@@ -773,6 +758,8 @@ struct BreakevenView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                CoinStackIllustration()
+                    .frame(width: 64, height: 52)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -893,77 +880,53 @@ private struct UserTier {
     let percentile: Int
 }
 
-// MARK: - Shield Shape
-
-private struct ShieldShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let w = rect.width
-        let h = rect.height
-        p.move(to: CGPoint(x: w * 0.5, y: 0))
-        p.addLine(to: CGPoint(x: w, y: h * 0.18))
-        p.addLine(to: CGPoint(x: w, y: h * 0.6))
-        p.addQuadCurve(
-            to: CGPoint(x: w * 0.5, y: h),
-            control: CGPoint(x: w, y: h * 0.95)
-        )
-        p.addQuadCurve(
-            to: CGPoint(x: 0, y: h * 0.6),
-            control: CGPoint(x: 0, y: h * 0.95)
-        )
-        p.addLine(to: CGPoint(x: 0, y: h * 0.18))
-        p.closeSubpath()
-        return p
-    }
-}
-
 // MARK: - Arrow Bar Shape
 
-/// 一体化的「箭头进度条」：左端圆角，右端尖头。
+/// 一体化的「箭头进度条」：左端圆角细杆，右端是张开箭翼、收向尖锋的优美箭头。
+/// rect 的高度是箭头的最大跨度（含箭翼），杆身只占其中居中的一条带。
 private struct ArrowBarShape: Shape {
-    /// 箭头尖端部分的水平宽度
+    /// 箭头部分（从箭翼到尖锋）的水平长度
     var headWidth: CGFloat
-    /// 左端圆角半径（一般等于条高的一半）
-    var cornerRadius: CGFloat
+    /// 杆身厚度占整体高度的比例（其余空间留给上下张开的箭翼）
+    var bodyRatio: CGFloat = 0.64
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
         let w = rect.width
         let h = rect.height
-        let r = min(cornerRadius, h / 2)
-        // 箭尖宽度受总宽限制，避免过短时挤变形
-        let head = max(0, min(headWidth, w - r))
-        let bodyEnd = w - head
+        let bodyH = h * bodyRatio
+        let topY = (h - bodyH) / 2          // 杆身上沿
+        let botY = topY + bodyH             // 杆身下沿
+        let r = bodyH / 2                    // 左端圆角半径
+        let head = max(bodyH, min(headWidth, w - r - 2))
+        let bodyEnd = w - head              // 杆身与箭头的交界
         let midY = h / 2
+        let tipX = w
+        // 箭翼略微后掠：翼尖比交界处再往左一点，箭锋更修长
+        let wingX = bodyEnd + head * 0.16
 
-        // 起点：左上圆弧起始
-        p.move(to: CGPoint(x: r, y: 0))
-        // 顶边到尾部 body 末端
-        p.addLine(to: CGPoint(x: bodyEnd, y: 0))
-        // 上斜边收到箭尖
-        p.addLine(to: CGPoint(x: w, y: midY))
-        // 下斜边回到底边
-        p.addLine(to: CGPoint(x: bodyEnd, y: h))
-        // 底边到左下圆弧起始
-        p.addLine(to: CGPoint(x: r, y: h))
+        // 左上圆角起点
+        p.move(to: CGPoint(x: r, y: topY))
+        // 杆身上沿
+        p.addLine(to: CGPoint(x: bodyEnd, y: topY))
+        // 张开到上箭翼尖
+        p.addLine(to: CGPoint(x: wingX, y: 0))
+        // 上翼前缘微凹，扫向尖锋
+        p.addQuadCurve(to: CGPoint(x: tipX, y: midY),
+                       control: CGPoint(x: tipX - head * 0.18, y: midY * 0.55))
+        // 尖锋扫向下箭翼尖（对称微凹）
+        p.addQuadCurve(to: CGPoint(x: wingX, y: h),
+                       control: CGPoint(x: tipX - head * 0.18, y: h - midY * 0.55))
+        // 收回杆身下沿
+        p.addLine(to: CGPoint(x: bodyEnd, y: botY))
+        // 杆身下沿回到左端
+        p.addLine(to: CGPoint(x: r, y: botY))
         // 左下圆角
-        p.addArc(
-            center: CGPoint(x: r, y: h - r),
-            radius: r,
-            startAngle: .degrees(90),
-            endAngle: .degrees(180),
-            clockwise: false
-        )
-        // 左侧竖边
-        p.addLine(to: CGPoint(x: 0, y: r))
+        p.addArc(center: CGPoint(x: r, y: midY), radius: r,
+                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
         // 左上圆角
-        p.addArc(
-            center: CGPoint(x: r, y: r),
-            radius: r,
-            startAngle: .degrees(180),
-            endAngle: .degrees(270),
-            clockwise: false
-        )
+        p.addArc(center: CGPoint(x: r, y: midY), radius: r,
+                 startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
         p.closeSubpath()
         return p
     }

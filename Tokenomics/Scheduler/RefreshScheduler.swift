@@ -8,7 +8,8 @@ final class RefreshScheduler {
     private let pricing: PricingService
     private let interval: TimeInterval
     private let onLog: (String) -> Void
-    private let onCycleComplete: (() async -> Void)?
+    /// 一轮采集结束后的回调；参数 `forced` = 本轮是否为用户手动触发（手动时下游可忽略限流）。
+    private let onCycleComplete: ((_ forced: Bool) async -> Void)?
     private var timer: Timer?
     private var inflight = false
 
@@ -18,7 +19,7 @@ final class RefreshScheduler {
         pricing: PricingService,
         interval: TimeInterval = 300,
         onLog: @escaping (String) -> Void = { _ in },
-        onCycleComplete: (() async -> Void)? = nil
+        onCycleComplete: ((_ forced: Bool) async -> Void)? = nil
     ) {
         self.collectors = collectors
         self.repository = repository
@@ -29,11 +30,11 @@ final class RefreshScheduler {
     }
 
     func start() async {
-        await refreshNow()
+        await refreshNow(forced: false)
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                await self?.refreshNow()
+                await self?.refreshNow(forced: false)
             }
         }
     }
@@ -43,7 +44,7 @@ final class RefreshScheduler {
         timer = nil
     }
 
-    func refreshNow() async {
+    func refreshNow(forced: Bool = false) async {
         guard !inflight else { return }
         inflight = true
         defer { inflight = false }
@@ -103,7 +104,7 @@ final class RefreshScheduler {
         }
         onLog("拉取完成")
         if let hook = onCycleComplete {
-            await hook()
+            await hook(forced)
         }
     }
 }

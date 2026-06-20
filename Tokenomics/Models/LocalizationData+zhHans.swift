@@ -226,6 +226,11 @@ enum LocalizationData_zhHans {
         "quotacard.empty": "无可显示的额度窗口",
         "quotacard.updated.fmt": "更新于 %@ · %@",
         "quotacard.reset.fmt": "将于 %@ 重置",
+        "quotacard.usage.title": "用量",
+        "quotacard.usage.today": "今日",
+        "quotacard.usage.week": "近 7 天",
+        "quotacard.usage.month": "近 30 天",
+        "quotacard.usage.tokens.fmt": "%@ tokens",
 
         // MARK: - Provider row / Cost card / Usage chart
         "providerrow.subtitle.fmt": "%d 条 · %@ tokens",

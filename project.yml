@@ -42,8 +42,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tokenomics.Tokenomics
+        # 必须用稳定签名身份（而非 ad-hoc / CODE_SIGNING_ALLOWED=NO）：
+        # macOS 钥匙串的“始终允许”是按代码签名身份记忆的，ad-hoc 二进制没有
+        # 稳定身份（cdhash 每次 build 都变），授权挂不住 → 每次读 Claude 凭证都重弹。
+        # 用免费的 Apple Development 证书签名后，一次“始终允许”即可永久生效。
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: "Apple Development"
+        DEVELOPMENT_TEAM: "JR39NPKJK6"
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES

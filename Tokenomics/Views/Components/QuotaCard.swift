@@ -26,7 +26,7 @@ struct QuotaCard: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 if snapshot.windows.isEmpty {
-                    Text("无可显示的额度窗口")
+                    Text(L10n.tr("quotacard.empty"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -38,7 +38,7 @@ struct QuotaCard: View {
             HStack(spacing: 4) {
                 Image(systemName: "clock")
                     .font(.caption2)
-                Text("更新于 \(Self.timeFmt.string(from: snapshot.fetchedAt)) · \(snapshot.source)")
+                Text(L10n.tr("quotacard.updated.fmt", Self.timeFmt.string(from: snapshot.fetchedAt), snapshot.source))
                     .font(.caption2)
             }
             .foregroundStyle(.secondary)
@@ -88,7 +88,7 @@ private struct QuotaWindowRow: View {
             }
             .frame(height: 6)
             if let resetAt = window.resetsAt {
-                Text("将于 \(Self.relativeFmt.localizedString(for: resetAt, relativeTo: Date())) 重置")
+                Text(L10n.tr("quotacard.reset.fmt", Self.relativeFmt.localizedString(for: resetAt, relativeTo: Date())))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

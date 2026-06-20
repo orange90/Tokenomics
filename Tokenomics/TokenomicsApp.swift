@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct TokenomicsApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var localization = LocalizationManager.shared
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -24,8 +25,10 @@ struct TokenomicsApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .environmentObject(localization)
                 .frame(minWidth: 980, minHeight: 640)
                 .preferredColorScheme(appState.appearance.colorScheme)
+                .id(localization.language.rawValue)
                 .task {
                     await appState.bootstrap(modelContext: sharedModelContainer.mainContext)
                 }
@@ -40,8 +43,10 @@ struct TokenomicsApp: App {
         Settings {
             SettingsView()
                 .environmentObject(appState)
+                .environmentObject(localization)
                 .modelContainer(sharedModelContainer)
                 .preferredColorScheme(appState.appearance.colorScheme)
+                .id(localization.language.rawValue)
         }
     }
 }

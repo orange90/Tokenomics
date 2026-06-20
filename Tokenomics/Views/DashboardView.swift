@@ -4,6 +4,7 @@ import Charts
 
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var localization: LocalizationManager
     @Query(sort: \UsageRecord.timestamp, order: .reverse) private var records: [UsageRecord]
 
     var body: some View {
@@ -12,7 +13,7 @@ struct DashboardView: View {
                 header
 
                 if !appState.quotaSnapshots.isEmpty {
-                    section("订阅额度（Claude / Codex）") {
+                    section(L10n.tr("dashboard.section.quota")) {
                         let cols = quotaColumns
                         LazyVGrid(columns: cols, spacing: 12) {
                             ForEach(quotaCards, id: \.snapshot.id) { item in
@@ -28,25 +29,25 @@ struct DashboardView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 12) {
-                    CostCard(title: "今日", costUSD: sum(records: today),
+                    CostCard(title: L10n.tr("dashboard.cost.today"), costUSD: sum(records: today),
                              totalTokens: tokens(today),
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .blue)
-                    CostCard(title: "本周", costUSD: sum(records: thisWeek),
+                    CostCard(title: L10n.tr("dashboard.cost.week"), costUSD: sum(records: thisWeek),
                              totalTokens: tokens(thisWeek),
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .green)
-                    CostCard(title: "本月", costUSD: sum(records: thisMonth),
+                    CostCard(title: L10n.tr("dashboard.cost.month"), costUSD: sum(records: thisMonth),
                              totalTokens: tokens(thisMonth),
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .orange)
-                    CostCard(title: "累计", costUSD: sum(records: records),
+                    CostCard(title: L10n.tr("dashboard.cost.total"), costUSD: sum(records: records),
                              totalTokens: tokens(records),
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .pink)
                 }
 
-                section("过去 14 天趋势") {
+                section(L10n.tr("dashboard.section.trend")) {
                     UsageTrendChart(
                         data: trendData(),
                         rate: appState.usdCnyRate,
@@ -54,7 +55,7 @@ struct DashboardView: View {
                     )
                 }
 
-                section("按供应商汇总（本月）") {
+                section(L10n.tr("dashboard.section.by_provider")) {
                     VStack(spacing: 0) {
                         ForEach(providerSummaries(), id: \.key) { item in
                             ProviderRow(
@@ -70,14 +71,14 @@ struct DashboardView: View {
                             Divider()
                         }
                         if providerSummaries().isEmpty {
-                            ContentUnavailableView("暂无数据", systemImage: "tray",
-                                description: Text("请在「设置」中配置 API Key，或确保 Claude Code/Cursor 已在本机产生过日志。"))
+                            ContentUnavailableView(L10n.tr("dashboard.empty.title"), systemImage: "tray",
+                                description: Text(L10n.tr("dashboard.empty.desc")))
                                 .padding()
                         }
                     }
                 }
 
-                section("最近 30 条明细") {
+                section(L10n.tr("dashboard.section.recent")) {
                     VStack(spacing: 0) {
                         ForEach(records.prefix(30)) { r in
                             RecordRow(record: r, currency: appState.currency, rate: appState.usdCnyRate)
@@ -89,6 +90,7 @@ struct DashboardView: View {
             .padding(20)
         }
         .background(Color(NSColor.windowBackgroundColor))
+        .id(localization.language.rawValue)
     }
 
     // MARK: - Header
@@ -96,15 +98,15 @@ struct DashboardView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("AI Token 用量仪表盘")
+                Text(L10n.tr("dashboard.title"))
                     .font(.title.bold())
-                Text("汇率 1 USD = ¥\(String(format: "%.2f", appState.usdCnyRate))" +
-                     (appState.lastRefreshAt.map { " · 上次更新 \(timeFmt.string(from: $0))" } ?? ""))
+                Text(L10n.tr("dashboard.rate.fmt", String(format: "%.2f", appState.usdCnyRate)) +
+                     (appState.lastRefreshAt.map { L10n.tr("dashboard.rate.last_update.fmt", timeFmt.string(from: $0)) } ?? ""))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Picker("货币", selection: Binding(
+            Picker(L10n.tr("dashboard.picker.currency"), selection: Binding(
                 get: { appState.currency },
                 set: { appState.updateCurrency($0) }
             )) {
@@ -269,7 +271,7 @@ struct RecordRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(CurrencyFormatting.format(usd: record.costUSD, currency: currency, usdCnyRate: rate))
                     .font(.callout.weight(.medium)).monospacedDigit()
-                Text("in \(record.inputTokens.formatted()) · out \(record.outputTokens.formatted())")
+                Text(L10n.tr("dashboard.recordrow.io.fmt", record.inputTokens.formatted(), record.outputTokens.formatted()))
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }

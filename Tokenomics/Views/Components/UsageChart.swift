@@ -16,10 +16,10 @@ struct UsageTrendChart: View {
     var body: some View {
         Chart(data) { item in
             BarMark(
-                x: .value("日期", item.day, unit: .day),
-                y: .value("花费 USD", item.costUSD)
+                x: .value(L10n.tr("usagechart.x.date"), item.day, unit: .day),
+                y: .value(L10n.tr("usagechart.y.cost_usd"), item.costUSD)
             )
-            .foregroundStyle(by: .value("供应商", item.provider))
+            .foregroundStyle(by: .value(L10n.tr("usagechart.legend.provider"), item.provider))
             .cornerRadius(3)
         }
         .chartLegend(position: .bottom, alignment: .center, spacing: 12)

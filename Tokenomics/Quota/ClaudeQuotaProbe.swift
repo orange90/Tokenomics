@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// 通过本地 Claude CLI OAuth 凭证拉取 Claude 订阅额度（5 小时窗口 + 每周窗口）。
 ///
@@ -9,6 +8,9 @@ import Security
 ///   - 回退：~/.claude/.credentials.json（旧版本 Claude CLI 的存放方式）
 ///   - 接口：GET https://api.anthropic.com/api/oauth/usage
 ///   - Headers：Authorization: Bearer <access_token>, anthropic-beta: oauth-2025-04-20
+///
+/// 关键：access token 寿命很短，过期后必须先用 refresh token 静默刷新，否则 usage 接口
+/// 直接 401/429。凭证读取 / 刷新 / 写回统一由 ``ClaudeOAuthCredentialStore`` 负责。
 ///
 /// 响应体（典型字段）：
 /// {
@@ -22,21 +24,39 @@ final class ClaudeQuotaProbe: QuotaProbe {
     let id = "claude"
     let displayName = "Claude"
 
-    private let credentialsURL: URL
-    private let keychainService = "Claude Code-credentials"
+    private let store: ClaudeOAuthCredentialStore
 
-    init() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        self.credentialsURL = home.appendingPathComponent(".claude/.credentials.json")
+    init(store: ClaudeOAuthCredentialStore = ClaudeOAuthCredentialStore()) {
+        self.store = store
     }
 
-    var isAvailable: Bool {
-        if hasKeychainCredentials() { return true }
-        return FileManager.default.fileExists(atPath: credentialsURL.path)
-    }
+    var isAvailable: Bool { store.isAvailable }
 
     func fetch() async throws -> QuotaSnapshot {
-        let token = try loadAccessToken()
+        var loaded = try store.load()
+
+        // 1) access token 已过期且有 refresh token → 先静默刷新，避免必定失败的请求。
+        if loaded.credentials.isExpired(), loaded.credentials.refreshToken != nil {
+            loaded.credentials = try await store.refresh(loaded)
+        }
+
+        do {
+            return try await fetchUsage(token: loaded.credentials.accessToken,
+                                        fallbackPlan: loaded.credentials.subscriptionType)
+        } catch APIError.httpStatus(let code, let body) where code == 401 {
+            // 2) 兜底：expiresAt 缺失/不准导致 token 实际已失效 → 刷新一次再重试。
+            guard loaded.credentials.refreshToken != nil else {
+                throw APIError.httpStatus(code, body)
+            }
+            let refreshed = try await store.refresh(loaded)
+            return try await fetchUsage(token: refreshed.accessToken,
+                                        fallbackPlan: refreshed.subscriptionType)
+        }
+    }
+
+    // MARK: - Usage fetch
+
+    private func fetchUsage(token: String, fallbackPlan: String?) async throws -> QuotaSnapshot {
         guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else {
             throw APIError.parse("invalid URL")
         }
@@ -45,7 +65,9 @@ final class ClaudeQuotaProbe: QuotaProbe {
         let data = try await APIClient.get(url: url, headers: [
             "Authorization": "Bearer \(token)",
             "anthropic-beta": "oauth-2025-04-20",
-            "anthropic-version": "2023-06-01"
+            "anthropic-version": "2023-06-01",
+            "Accept": "application/json",
+            "User-Agent": "claude-code/2.1.0"
         ], timeout: 12)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -68,6 +90,7 @@ final class ClaudeQuotaProbe: QuotaProbe {
 
         let plan = (json["subscriptionType"] as? String)
             ?? (json["rate_limit_tier"] as? String)
+            ?? fallbackPlan
         let account = plan.map { "Claude \($0.capitalized)" }
 
         return QuotaSnapshot(
@@ -79,8 +102,6 @@ final class ClaudeQuotaProbe: QuotaProbe {
             source: "OAuth API"
         )
     }
-
-    // MARK: - Helpers
 
     private func parseWindow(_ raw: Any?, id: String, title: String, note: String?) -> QuotaWindow? {
         guard let dict = raw as? [String: Any] else { return nil }
@@ -94,65 +115,5 @@ final class ClaudeQuotaProbe: QuotaProbe {
             return nil
         }()
         return QuotaWindow(id: id, title: title, usedPercent: util, resetsAt: resetsAt, note: note)
-    }
-
-    private func loadAccessToken() throws -> String {
-        // 优先：Keychain "Claude Code-credentials"（新版本 Claude Code 默认）
-        if let tok = try? readKeychainAccessToken() {
-            return tok
-        }
-        // 回退：~/.claude/.credentials.json
-        if FileManager.default.fileExists(atPath: credentialsURL.path) {
-            let data = try Data(contentsOf: credentialsURL)
-            return try parseAccessToken(from: data)
-        }
-        throw APIError.missingKey
-    }
-
-    /// 检查 Keychain 中是否有 "Claude Code-credentials" 条目。
-    /// 注意：这里不读取数据，避免触发 macOS Keychain 授权弹窗；
-    /// 真正的读取发生在 fetch() 时由用户主动触发。
-    private func hasKeychainCredentials() -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnAttributes as String: true
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        return status == errSecSuccess
-    }
-
-    private func readKeychainAccessToken() throws -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnData as String: true
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else {
-            throw APIError.missingKey
-        }
-        return try parseAccessToken(from: data)
-    }
-
-    /// 从 Claude credentials JSON 中提取 access token。
-    /// 兼容结构：
-    ///   { "claudeAiOauth": { "accessToken": "..." } }
-    ///   { "accessToken": "..." } / { "access_token": "..." }
-    private func parseAccessToken(from data: Data) throws -> String {
-        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError.parse("Claude credentials not JSON")
-        }
-        if let outer = root["claudeAiOauth"] as? [String: Any] {
-            if let tok = outer["accessToken"] as? String, !tok.isEmpty { return tok }
-            if let tok = outer["access_token"] as? String, !tok.isEmpty { return tok }
-        }
-        if let tok = root["accessToken"] as? String, !tok.isEmpty { return tok }
-        if let tok = root["access_token"] as? String, !tok.isEmpty { return tok }
-        throw APIError.missingKey
     }
 }

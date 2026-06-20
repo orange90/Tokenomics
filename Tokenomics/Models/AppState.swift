@@ -13,9 +13,9 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system: return "跟随系统"
-        case .light:  return "白色模式"
-        case .dark:   return "暗黑模式"
+        case .system: return L10n.tr("appearance.system")
+        case .light:  return L10n.tr("appearance.light")
+        case .dark:   return L10n.tr("appearance.dark")
         }
     }
 

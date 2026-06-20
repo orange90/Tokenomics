@@ -7,9 +7,9 @@ enum Currency: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .usd:  return "美元 (USD)"
-        case .cny:  return "人民币 (CNY)"
-        case .both: return "双显示"
+        case .usd:  return L10n.tr("currency.usd")
+        case .cny:  return L10n.tr("currency.cny")
+        case .both: return L10n.tr("currency.both")
         }
     }
 

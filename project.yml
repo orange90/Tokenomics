@@ -33,10 +33,12 @@ targets:
     entitlements:
       path: Tokenomics/Tokenomics.entitlements
       properties:
+        # App Sandbox 必须保持关闭：沙盒应用读不到 Claude CLI 写在 login keychain
+        # 里的 "Claude Code-credentials"（也访问不了 ~/.claude）。CodexBar 同样不开沙盒。
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
-        keychain-access-groups:
-          - $(AppIdentifierPrefix)com.tokenomics.Tokenomics
+        # 不要 keychain-access-groups：它只用于在“自己的”多个 app 间共享钥匙串，
+        # 读取 Claude 的条目根本用不上；带上它反而要求开发者证书签名，徒增运行门槛。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tokenomics.Tokenomics

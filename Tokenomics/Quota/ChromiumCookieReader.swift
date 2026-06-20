@@ -53,14 +53,14 @@ enum ChromiumCookieError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .browserNotInstalled(let b): return "\(b.displayName) 未安装"
-        case .noCookiesFile(let b):       return "\(b.displayName) 未找到 Cookies 文件"
-        case .sqliteUnavailable:           return "系统未提供 /usr/bin/sqlite3"
-        case .sqliteFailed(let m):         return "读取 SQLite 失败：\(m)"
-        case .noSessionKey(let b):         return "\(b.displayName) 没有 claude.ai 的 sessionKey（请先登录 claude.ai）"
-        case .keychainMissing(let b):      return "\(b.displayName) Safe Storage 密钥不存在"
-        case .keychainDenied(let b, let s):return "\(b.displayName) Safe Storage 钥匙串访问被拒绝（OSStatus=\(s)）"
-        case .decryptFailed(let m):        return "cookie 解密失败：\(m)"
+        case .browserNotInstalled(let b): return L10n.tr("browser.not_installed.fmt", b.displayName)
+        case .noCookiesFile(let b):       return L10n.tr("browser.no_cookies.fmt", b.displayName)
+        case .sqliteUnavailable:           return L10n.tr("browser.sqlite_unavailable")
+        case .sqliteFailed(let m):         return L10n.tr("browser.sqlite_failed.fmt", m)
+        case .noSessionKey(let b):         return L10n.tr("browser.no_session_key.fmt", b.displayName)
+        case .keychainMissing(let b):      return L10n.tr("browser.keychain_missing.fmt", b.displayName)
+        case .keychainDenied(let b, let s):return L10n.tr("browser.keychain_denied.fmt", b.displayName, String(s))
+        case .decryptFailed(let m):        return L10n.tr("browser.decrypt_failed.fmt", m)
         }
     }
 }
@@ -212,19 +212,18 @@ final class ChromiumCookieReader {
             return .failure(.sqliteFailed("拷贝 Cookies 失败: \(error.localizedDescription)"))
         }
 
-        // 用 hex 模式输出 encrypted_value 二进制，配合 | 作为列分隔避免冲突
-        // .mode list / .separator "|" / 用 hex(encrypted_value) 把 BLOB 转十六进制
-        let sql = """
-        .mode list
-        .separator |
-        SELECT host_key, hex(encrypted_value) FROM cookies
-         WHERE name = 'sessionKey' AND host_key LIKE '%claude.ai';
-        """
+        // 用 hex(encrypted_value) 把 BLOB 转十六进制，| 作为列分隔避免冲突。
+        // 注意：list 模式与分隔符必须用命令行 flag（-list / -separator）传入，
+        // **不能**把 `.mode list` / `.separator |` 这类点命令塞进 SQL 参数里——
+        // sqlite3 会把分隔符当成多余参数报错（"extra argument: |"），导致整条备用路失败。
+        let sql = "SELECT host_key, hex(encrypted_value) FROM cookies"
+            + " WHERE name = 'sessionKey' AND host_key LIKE '%claude.ai';"
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: sqlite)
         // -readonly + immutable=1：避免触发 SQLite 写锁
-        proc.arguments = ["-readonly", "file:\(copyURL.path)?immutable=1", sql]
+        proc.arguments = ["-readonly", "-list", "-separator", "|",
+                          "file:\(copyURL.path)?immutable=1", sql]
         let outPipe = Pipe(), errPipe = Pipe()
         proc.standardOutput = outPipe
         proc.standardError = errPipe

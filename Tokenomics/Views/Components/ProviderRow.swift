@@ -53,7 +53,7 @@ struct ProviderRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayName)
                     .font(.body.weight(.medium))
-                Text("\(recordCount) 条 · \(totalTokens.formatted()) tokens")
+                Text(L10n.tr("providerrow.subtitle.fmt", recordCount, totalTokens.formatted()))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

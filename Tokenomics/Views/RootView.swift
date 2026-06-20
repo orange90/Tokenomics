@@ -3,13 +3,14 @@ import SwiftData
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var selection: SidebarItem? = .dashboard
+    @EnvironmentObject private var localization: LocalizationManager
+    @State private var selection: SidebarItem? = .breakeven
 
     enum SidebarItem: Hashable, Identifiable {
         case dashboard
         case breakeven
         case provider(Provider)
-        case customProvider(String)   // CustomProvider.id
+        case customProvider(String)
         case models
         case logs
 
@@ -37,28 +38,29 @@ struct RootView: View {
                 Button {
                     appState.manualRefresh()
                 } label: {
-                    Label("刷新", systemImage: appState.isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                    Label(L10n.tr("toolbar.refresh"), systemImage: appState.isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
                 }
                 .disabled(appState.isRefreshing)
-                .help("立即拉取所有 Collector")
+                .help(L10n.tr("toolbar.refresh.help"))
             }
         }
-        .navigationTitle("Token 计数器")
+        .navigationTitle(L10n.tr("app.title"))
+        .id(localization.language.rawValue)
     }
 
     private var sidebar: some View {
         List(selection: $selection) {
-            Section("总览") {
-                Label("仪表盘", systemImage: "chart.line.uptrend.xyaxis")
-                    .tag(SidebarItem.dashboard)
-                Label("回本没", systemImage: "figure.dance")
+            Section(L10n.tr("sidebar.section.overview")) {
+                Label(L10n.tr("sidebar.breakeven"), systemImage: "figure.dance")
                     .tag(SidebarItem.breakeven)
-                Label("模型分布", systemImage: "square.grid.2x2")
+                Label(L10n.tr("sidebar.dashboard"), systemImage: "chart.line.uptrend.xyaxis")
+                    .tag(SidebarItem.dashboard)
+                Label(L10n.tr("sidebar.models"), systemImage: "square.grid.2x2")
                     .tag(SidebarItem.models)
-                Label("拉取日志", systemImage: "doc.text")
+                Label(L10n.tr("sidebar.logs"), systemImage: "doc.text")
                     .tag(SidebarItem.logs)
             }
-            Section("供应商") {
+            Section(L10n.tr("sidebar.section.providers")) {
                 ForEach(Provider.allCases.filter { $0 != .unknown && !appState.isProviderHidden($0.rawValue) }) { p in
                     Label {
                         Text(p.displayName)
@@ -82,7 +84,7 @@ struct RootView: View {
 
     @ViewBuilder
     private var detail: some View {
-        switch selection ?? .dashboard {
+        switch selection ?? .breakeven {
         case .dashboard:
             DashboardView()
         case .breakeven:
@@ -93,7 +95,7 @@ struct RootView: View {
             if let cp = appState.customProviders.first(where: { $0.id == key }) {
                 ProviderDetailView(customProviderKey: cp.id, displayName: cp.name, colorHex: cp.colorHex)
             } else {
-                ContentUnavailableView("供应商不存在", systemImage: "questionmark.circle")
+                ContentUnavailableView(L10n.tr("common.provider_not_exist"), systemImage: "questionmark.circle")
             }
         case .models:
             ModelBreakdownView()
@@ -108,9 +110,9 @@ struct LogsView: View {
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
-                Text("拉取日志").font(.title2.bold())
+                Text(L10n.tr("logs.title")).font(.title2.bold())
                 Spacer()
-                Button("清空") { appState.statusMessages.removeAll() }
+                Button(L10n.tr("logs.clear")) { appState.statusMessages.removeAll() }
             }.padding()
             Divider()
             ScrollView {

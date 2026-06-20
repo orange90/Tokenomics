@@ -24,24 +24,24 @@ enum Provider: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .anthropic:   return "Anthropic"
-        case .openai:      return "OpenAI"
-        case .google:      return "Google Gemini"
-        case .deepseek:    return "DeepSeek"
-        case .qwen:        return "通义千问 (国内)"
-        case .qwenIntl:    return "Qwen (International)"
-        case .siliconflow: return "硅基流动"
-        case .openrouter:  return "OpenRouter"
-        case .stepfun:     return "阶跃星辰 (Stepfun)"
-        case .mimo:        return "小米 MiMo"
-        case .kimi:        return "Kimi (Moonshot)"
-        case .glm:         return "智谱 GLM"
-        case .minimax:     return "MiniMax (海螺)"
-        case .cursor:      return "Cursor"
-        case .traeSolo:    return "TRAE Solo"
-        case .qoder:       return "Qoder"
-        case .volcengine:  return "火山方舟 (豆包)"
-        case .unknown:     return "未知"
+        case .anthropic:   return L10n.tr("provider.anthropic")
+        case .openai:      return L10n.tr("provider.openai")
+        case .google:      return L10n.tr("provider.google")
+        case .deepseek:    return L10n.tr("provider.deepseek")
+        case .qwen:        return L10n.tr("provider.qwen")
+        case .qwenIntl:    return L10n.tr("provider.qwenIntl")
+        case .siliconflow: return L10n.tr("provider.siliconflow")
+        case .openrouter:  return L10n.tr("provider.openrouter")
+        case .stepfun:     return L10n.tr("provider.stepfun")
+        case .mimo:        return L10n.tr("provider.mimo")
+        case .kimi:        return L10n.tr("provider.kimi")
+        case .glm:         return L10n.tr("provider.glm")
+        case .minimax:     return L10n.tr("provider.minimax")
+        case .cursor:      return L10n.tr("provider.cursor")
+        case .traeSolo:    return L10n.tr("provider.traeSolo")
+        case .qoder:       return L10n.tr("provider.qoder")
+        case .volcengine:  return L10n.tr("provider.volcengine")
+        case .unknown:     return L10n.tr("provider.unknown")
         }
     }
 

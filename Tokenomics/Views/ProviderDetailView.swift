@@ -6,6 +6,7 @@ struct ProviderDetailView: View {
     let displayName: String
     let colorHex: String
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var localization: LocalizationManager
     @Query private var allRecords: [UsageRecord]
 
     init(provider: Provider) {
@@ -38,15 +39,15 @@ struct ProviderDetailView: View {
                     Circle().fill(Color(hex: colorHex)).frame(width: 14, height: 14)
                     Text(displayName).font(.title.bold())
                     Spacer()
-                    Text("共 \(allRecords.count) 条 · 累计 \(CurrencyFormatting.format(usd: totalCost, currency: appState.currency, usdCnyRate: appState.usdCnyRate))")
+                    Text(L10n.tr("provider_detail.count_total.fmt", allRecords.count, CurrencyFormatting.format(usd: totalCost, currency: appState.currency, usdCnyRate: appState.usdCnyRate)))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
 
                 if allRecords.isEmpty {
-                    ContentUnavailableView("暂无 \(displayName) 数据",
+                    ContentUnavailableView(L10n.tr("provider_detail.empty.title.fmt", displayName),
                         systemImage: "questionmark.folder",
-                        description: Text("配置 API Key 后等待下次定时拉取，或确认对应本地日志路径存在。"))
+                        description: Text(L10n.tr("provider_detail.empty.desc")))
                     apiKeyGuide
                 } else {
                     modelBreakdown
@@ -55,6 +56,7 @@ struct ProviderDetailView: View {
             }
             .padding(20)
         }
+        .id(localization.language.rawValue)
     }
 
     private var totalCost: Double { allRecords.reduce(0) { $0 + $1.costUSD } }
@@ -65,13 +67,13 @@ struct ProviderDetailView: View {
             (model, recs.reduce(0) { $0 + $1.costUSD }, recs.reduce(0) { $0 + $1.totalTokens })
         }.sorted { $0.1 > $1.1 }
         return VStack(alignment: .leading, spacing: 8) {
-            Text("按模型").font(.headline)
+            Text(L10n.tr("provider_detail.by_model")).font(.headline)
             VStack(spacing: 0) {
                 ForEach(rows, id: \.0) { row in
                     HStack {
                         Text(row.0).font(.body.monospaced())
                         Spacer()
-                        Text("\(row.2.formatted()) tokens").foregroundStyle(.secondary).font(.caption)
+                        Text(L10n.tr("provider_detail.tokens.fmt", row.2.formatted())).foregroundStyle(.secondary).font(.caption)
                         Text(CurrencyFormatting.format(usd: row.1, currency: appState.currency, usdCnyRate: appState.usdCnyRate))
                             .frame(width: 160, alignment: .trailing)
                             .monospacedDigit().font(.callout.weight(.medium))
@@ -88,7 +90,7 @@ struct ProviderDetailView: View {
 
     private var recentList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("最近明细").font(.headline)
+            Text(L10n.tr("provider_detail.recent")).font(.headline)
             VStack(spacing: 0) {
                 ForEach(allRecords.prefix(100)) { r in
                     RecordRow(record: r, currency: appState.currency, rate: appState.usdCnyRate)
@@ -110,7 +112,7 @@ struct ProviderDetailView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "key.horizontal.fill")
                         .foregroundStyle(Color(hex: colorHex))
-                    Text("如何获取 \(guide.keyName)")
+                    Text(L10n.tr("provider_detail.api_key_guide.fmt", guide.keyName))
                         .font(.headline)
                 }
 

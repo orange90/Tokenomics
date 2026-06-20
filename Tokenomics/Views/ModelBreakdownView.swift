@@ -4,14 +4,15 @@ import Charts
 
 struct ModelBreakdownView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var localization: LocalizationManager
     @Query(sort: \UsageRecord.timestamp, order: .reverse) private var records: [UsageRecord]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("模型分布").font(.title.bold())
+                Text(L10n.tr("models.title")).font(.title.bold())
                 if records.isEmpty {
-                    ContentUnavailableView("暂无数据", systemImage: "chart.pie")
+                    ContentUnavailableView(L10n.tr("models.empty"), systemImage: "chart.pie")
                 } else {
                     pieChart
                     table
@@ -19,6 +20,7 @@ struct ModelBreakdownView: View {
             }
             .padding(20)
         }
+        .id(localization.language.rawValue)
     }
 
     private struct Row: Identifiable {
@@ -46,12 +48,12 @@ struct ModelBreakdownView: View {
     private var pieChart: some View {
         Chart(rows.prefix(8).map { $0 }) { row in
             SectorMark(
-                angle: .value("花费", row.cost),
+                angle: .value(L10n.tr("models.chart.cost"), row.cost),
                 innerRadius: .ratio(0.55),
                 angularInset: 1
             )
             .cornerRadius(4)
-            .foregroundStyle(by: .value("模型", row.model))
+            .foregroundStyle(by: .value(L10n.tr("models.col.model"), row.model))
         }
         .frame(height: 260)
     }
@@ -59,10 +61,10 @@ struct ModelBreakdownView: View {
     private var table: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("模型").font(.caption.bold()).frame(maxWidth: .infinity, alignment: .leading)
-                Text("供应商").font(.caption.bold()).frame(width: 140, alignment: .leading)
-                Text("Token").font(.caption.bold()).frame(width: 140, alignment: .trailing)
-                Text("花费").font(.caption.bold()).frame(width: 180, alignment: .trailing)
+                Text(L10n.tr("models.col.model")).font(.caption.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                Text(L10n.tr("models.col.provider")).font(.caption.bold()).frame(width: 140, alignment: .leading)
+                Text(L10n.tr("models.col.tokens")).font(.caption.bold()).frame(width: 140, alignment: .trailing)
+                Text(L10n.tr("models.col.cost")).font(.caption.bold()).frame(width: 180, alignment: .trailing)
             }
             .padding(.vertical, 6)
             Divider()

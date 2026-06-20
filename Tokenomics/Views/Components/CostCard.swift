@@ -20,7 +20,7 @@ struct CostCard: View {
             HStack(spacing: 4) {
                 Image(systemName: "circle.hexagongrid")
                     .font(.caption2)
-                Text("\(totalTokens.formatted()) tokens")
+                Text(L10n.tr("costcard.tokens.fmt", totalTokens.formatted()))
                     .font(.caption)
             }
             .foregroundStyle(.secondary)

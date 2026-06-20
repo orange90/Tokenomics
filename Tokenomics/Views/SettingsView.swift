@@ -3,6 +3,7 @@ import SwiftData
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var localization: LocalizationManager
     @State private var selectedTab: Tab = .keys
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -19,35 +20,36 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             APIKeysSettings()
-                .tabItem { Label("API Keys", systemImage: "key.horizontal") }
+                .tabItem { Label(L10n.tr("settings.tab.keys"), systemImage: "key.horizontal") }
                 .tag(Tab.keys)
 
             ProvidersSettings()
-                .tabItem { Label("供应商", systemImage: "rectangle.stack.badge.person.crop") }
+                .tabItem { Label(L10n.tr("settings.tab.providers"), systemImage: "rectangle.stack.badge.person.crop") }
                 .tag(Tab.providers)
 
             SubscriptionsSettings()
-                .tabItem { Label("订阅", systemImage: "creditcard") }
+                .tabItem { Label(L10n.tr("settings.tab.subscriptions"), systemImage: "creditcard") }
                 .tag(Tab.subscriptions)
 
             QuotaSourcesSettings()
-                .tabItem { Label("额度采集", systemImage: "gauge.with.dots.needle.bottom.50percent") }
+                .tabItem { Label(L10n.tr("settings.tab.quotaSources"), systemImage: "gauge.with.dots.needle.bottom.50percent") }
                 .tag(Tab.quotaSources)
 
             DisplaySettings()
-                .tabItem { Label("显示", systemImage: "paintbrush") }
+                .tabItem { Label(L10n.tr("settings.tab.display"), systemImage: "paintbrush") }
                 .tag(Tab.display)
 
             PricingSettings()
-                .tabItem { Label("单价", systemImage: "dollarsign.circle") }
+                .tabItem { Label(L10n.tr("settings.tab.pricing"), systemImage: "dollarsign.circle") }
                 .tag(Tab.pricing)
 
             DataSettings()
-                .tabItem { Label("数据", systemImage: "internaldrive") }
+                .tabItem { Label(L10n.tr("settings.tab.data"), systemImage: "internaldrive") }
                 .tag(Tab.data)
         }
         .frame(width: 680, height: 520)
         .padding(20)
+        .id(localization.language.rawValue)
     }
 }
 
@@ -56,58 +58,60 @@ struct SettingsView: View {
 private struct APIKeysSettings: View {
     @EnvironmentObject private var appState: AppState
 
-    private let entries: [(provider: String, label: String, key: String, hint: String)] = [
-        (Provider.openai.rawValue,      "OpenAI Admin Key",         KeychainKey.openai,     "用于 /v1/organization/usage 接口"),
-        (Provider.anthropic.rawValue,   "Anthropic Admin Key",      KeychainKey.anthropic,  "用于 /v1/organizations/usage_report 接口"),
-        (Provider.deepseek.rawValue,    "DeepSeek API Key",         KeychainKey.deepseek,   "拉取 /user/balance"),
-        (Provider.google.rawValue,      "Gemini API Key",           KeychainKey.gemini,     "用作健康检查（暂无 usage API）"),
-        (Provider.qwen.rawValue,        "通义千问 (国内) DashScope Key", KeychainKey.qwen, "国内端点 dashscope.aliyuncs.com，健康检查"),
-        (Provider.qwenIntl.rawValue,    "Qwen (International) Key", KeychainKey.qwenIntl,   "国际端点 dashscope-intl.aliyuncs.com，健康检查"),
-        (Provider.siliconflow.rawValue, "SiliconFlow Key",          KeychainKey.siliconflow,"拉取 /v1/user/info"),
-        (Provider.openrouter.rawValue,  "OpenRouter Key",           KeychainKey.openrouter, "拉取 /api/v1/credits"),
-        (Provider.stepfun.rawValue,     "Stepfun API Key",          KeychainKey.stepfun,    "拉取 /v1/accounts（余额快照）"),
-        (Provider.mimo.rawValue,        "小米 MiMo API Key",         KeychainKey.mimo,       "用作健康检查（暂无 usage API）"),
-        (Provider.kimi.rawValue,        "Kimi (Moonshot) API Key",  KeychainKey.kimi,       "拉取 /v1/users/me/balance（余额快照）"),
-        (Provider.minimax.rawValue,     "MiniMax (海螺) API Key",    KeychainKey.minimax,    "用作健康检查（暂无 usage API）"),
-        (Provider.glm.rawValue,         "智谱 GLM API Key",          KeychainKey.glm,        "BigModel 端点 open.bigmodel.cn，健康检查"),
-        (Provider.volcengine.rawValue,  "火山方舟 (豆包) API Key",   KeychainKey.volcengine, "Ark 端点 ark.cn-beijing.volces.com，健康检查")
-    ]
+    private var entries: [(provider: String, label: String, key: String, hint: String)] {
+        [
+            (Provider.openai.rawValue,      "OpenAI Admin Key",         KeychainKey.openai,     L10n.tr("apikey.hint.openai")),
+            (Provider.anthropic.rawValue,   "Anthropic Admin Key",      KeychainKey.anthropic,  L10n.tr("apikey.hint.anthropic")),
+            (Provider.deepseek.rawValue,    "DeepSeek API Key",         KeychainKey.deepseek,   L10n.tr("apikey.hint.deepseek")),
+            (Provider.google.rawValue,      "Gemini API Key",           KeychainKey.gemini,     L10n.tr("apikey.hint.gemini")),
+            (Provider.qwen.rawValue,        L10n.tr("apikey.label.qwen"), KeychainKey.qwen,     L10n.tr("apikey.hint.qwen")),
+            (Provider.qwenIntl.rawValue,    "Qwen (International) Key", KeychainKey.qwenIntl,   L10n.tr("apikey.hint.qwenIntl")),
+            (Provider.siliconflow.rawValue, "SiliconFlow Key",          KeychainKey.siliconflow, L10n.tr("apikey.hint.siliconflow")),
+            (Provider.openrouter.rawValue,  "OpenRouter Key",           KeychainKey.openrouter, L10n.tr("apikey.hint.openrouter")),
+            (Provider.stepfun.rawValue,     "Stepfun API Key",          KeychainKey.stepfun,    L10n.tr("apikey.hint.stepfun")),
+            (Provider.mimo.rawValue,        L10n.tr("apikey.label.mimo"), KeychainKey.mimo,     L10n.tr("apikey.hint.mimo")),
+            (Provider.kimi.rawValue,        "Kimi (Moonshot) API Key",  KeychainKey.kimi,       L10n.tr("apikey.hint.kimi")),
+            (Provider.minimax.rawValue,     L10n.tr("apikey.label.minimax"), KeychainKey.minimax, L10n.tr("apikey.hint.minimax")),
+            (Provider.glm.rawValue,         L10n.tr("apikey.label.glm"), KeychainKey.glm,       L10n.tr("apikey.hint.glm")),
+            (Provider.volcengine.rawValue,  L10n.tr("apikey.label.volcengine"), KeychainKey.volcengine, L10n.tr("apikey.hint.volcengine"))
+        ]
+    }
 
     var body: some View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("在下方为各个服务商填写 API Key，App 会用它们去拉取用量或余额。")
+                    Text(L10n.tr("settings.keys.intro"))
                         .font(.callout)
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("服务商").font(.caption.weight(.semibold))
-                            Text("AI 服务名称").font(.caption2).foregroundStyle(.secondary)
+                            Text(L10n.tr("settings.keys.col.provider")).font(.caption.weight(.semibold))
+                            Text(L10n.tr("settings.keys.col.provider.sub")).font(.caption2).foregroundStyle(.secondary)
                         }
                         .frame(width: 140, alignment: .leading)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("用途").font(.caption.weight(.semibold))
-                            Text("该 Key 用于调用哪个接口").font(.caption2).foregroundStyle(.secondary)
+                            Text(L10n.tr("settings.keys.col.usage")).font(.caption.weight(.semibold))
+                            Text(L10n.tr("settings.keys.col.usage.sub")).font(.caption2).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("API Key").font(.caption.weight(.semibold))
-                            Text("粘贴你的密钥并点击「保存」").font(.caption2).foregroundStyle(.secondary)
+                            Text(L10n.tr("settings.keys.col.apikey")).font(.caption.weight(.semibold))
+                            Text(L10n.tr("settings.keys.col.apikey.sub")).font(.caption2).foregroundStyle(.secondary)
                         }
                         .frame(width: 260, alignment: .leading)
                     }
-                    Text("密钥保存在系统 Keychain 中，不会随数据库导出。")
+                    Text(L10n.tr("settings.keys.security"))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
             } header: {
-                Text("说明")
+                Text(L10n.tr("settings.keys.section.note"))
             }
 
             Section {
                 let visible = entries.filter { !appState.isProviderHidden($0.provider) }
                 if visible.isEmpty {
-                    Text("所有内置供应商均已在「供应商」标签下隐藏。")
+                    Text(L10n.tr("settings.keys.empty"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -115,7 +119,7 @@ private struct APIKeysSettings: View {
                     APIKeyRow(label: e.label, keyName: e.key, hint: e.hint, keychain: appState.keychain)
                 }
             } header: {
-                Text("密钥列表")
+                Text(L10n.tr("settings.keys.section.list"))
             }
         }
         .formStyle(.grouped)
@@ -138,17 +142,17 @@ private struct APIKeyRow: View {
             }
             Spacer()
             VStack(alignment: .trailing) {
-                SecureField(hasKey ? "已设置（输入新值覆盖）" : "未设置", text: $value)
+                SecureField(hasKey ? L10n.tr("settings.keys.placeholder.set") : L10n.tr("settings.keys.placeholder.unset"), text: $value)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 260)
                 HStack {
-                    Button("保存") {
+                    Button(L10n.tr("common.save")) {
                         keychain.set(value, for: keyName)
                         value = ""
                         hasKey = keychain.hasKey(keyName)
                     }
                     .disabled(value.isEmpty)
-                    Button("删除") {
+                    Button(L10n.tr("common.delete")) {
                         keychain.delete(keyName)
                         hasKey = false
                     }
@@ -164,11 +168,25 @@ private struct APIKeyRow: View {
 
 private struct DisplaySettings: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var localization = LocalizationManager.shared
 
     var body: some View {
         Form {
-            Section("外观") {
-                Picker("显示模式", selection: Binding(
+            Section(L10n.tr("settings.language.section")) {
+                Picker(L10n.tr("settings.language.picker"), selection: Binding(
+                    get: { localization.language },
+                    set: { localization.update($0) }
+                )) {
+                    Text(L10n.tr("lang.simplified_chinese")).tag(AppLanguage.zhHans)
+                    Text(L10n.tr("lang.traditional_chinese")).tag(AppLanguage.zhHant)
+                    Text(L10n.tr("lang.english")).tag(AppLanguage.en)
+                    Text(L10n.tr("lang.system")).tag(AppLanguage.system)
+                }
+                .pickerStyle(.menu)
+            }
+
+            Section(L10n.tr("settings.display.appearance")) {
+                Picker(L10n.tr("settings.display.mode"), selection: Binding(
                     get: { appState.appearance },
                     set: { appState.updateAppearance($0) }
                 )) {
@@ -177,19 +195,19 @@ private struct DisplaySettings: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("货币") {
-                Picker("显示", selection: Binding(
+            Section(L10n.tr("settings.display.currency")) {
+                Picker(L10n.tr("settings.display.currency.label"), selection: Binding(
                     get: { appState.currency },
                     set: { appState.updateCurrency($0) }
                 )) {
                     ForEach(Currency.allCases) { Text($0.displayName).tag($0) }
                 }
                 HStack {
-                    Text("当前汇率")
+                    Text(L10n.tr("settings.display.rate"))
                     Spacer()
                     Text("1 USD = ¥\(String(format: "%.4f", appState.usdCnyRate))")
                         .monospacedDigit()
-                    Button("刷新") {
+                    Button(L10n.tr("settings.display.rate.refresh")) {
                         Task {
                             if let r = try? await appState.exchangeRateService.fetchUSDtoCNY(forceRefresh: true) {
                                 await MainActor.run { appState.usdCnyRate = r }
@@ -260,12 +278,12 @@ private struct PricingSettings: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("模型单价（USD per 1M tokens）").font(.headline)
-                    Text("已内置 Anthropic / OpenAI 等常用模型公开单价；如需覆盖，填写下方表单或在列表中点击「覆盖」。")
+                    Text(L10n.tr("pricing.title")).font(.headline)
+                    Text(L10n.tr("pricing.desc"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                TextField("搜索 provider 或 model", text: $filterText)
+                TextField(L10n.tr("pricing.search"), text: $filterText)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
             }
@@ -276,11 +294,11 @@ private struct PricingSettings: View {
                 VStack(alignment: .leading, spacing: 4) {
                     // 表头
                     HStack(spacing: 8) {
-                        Text("模型").frame(maxWidth: .infinity, alignment: .leading)
-                        Text("输入").frame(width: 80, alignment: .trailing)
-                        Text("输出").frame(width: 80, alignment: .trailing)
-                        Text("缓存写").frame(width: 70, alignment: .trailing)
-                        Text("缓存读").frame(width: 70, alignment: .trailing)
+                        Text(L10n.tr("pricing.col.model")).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(L10n.tr("pricing.col.input")).frame(width: 80, alignment: .trailing)
+                        Text(L10n.tr("pricing.col.output")).frame(width: 80, alignment: .trailing)
+                        Text(L10n.tr("pricing.col.cacheWrite")).frame(width: 70, alignment: .trailing)
+                        Text(L10n.tr("pricing.col.cacheRead")).frame(width: 70, alignment: .trailing)
                         Text("").frame(width: 60)
                     }
                     .font(.caption.weight(.semibold))
@@ -300,7 +318,7 @@ private struct PricingSettings: View {
                         appState.pricingService.allEntries.first(where: { $0.key == o.key }) == nil
                     }
                     if !extraOverrides.isEmpty {
-                        Text("自定义条目").font(.subheadline.weight(.semibold))
+                        Text(L10n.tr("pricing.custom_entries")).font(.subheadline.weight(.semibold))
                             .padding(.top, 10)
                             .padding(.horizontal, 6)
                         ForEach(extraOverrides) { o in
@@ -336,12 +354,12 @@ private struct PricingSettings: View {
 
             Divider()
             VStack(alignment: .leading, spacing: 4) {
-                Text("手动添加 / 覆盖单价").font(.subheadline.weight(.semibold))
+                Text(L10n.tr("pricing.add_section")).font(.subheadline.weight(.semibold))
                 HStack {
-                    TextField("key (provider:model)", text: $newKey).textFieldStyle(.roundedBorder)
-                    TextField("input", text: $newInput).textFieldStyle(.roundedBorder).frame(width: 80)
-                    TextField("output", text: $newOutput).textFieldStyle(.roundedBorder).frame(width: 80)
-                    Button("保存") {
+                    TextField(L10n.tr("pricing.placeholder.key"), text: $newKey).textFieldStyle(.roundedBorder)
+                    TextField(L10n.tr("pricing.placeholder.input"), text: $newInput).textFieldStyle(.roundedBorder).frame(width: 80)
+                    TextField(L10n.tr("pricing.placeholder.output"), text: $newOutput).textFieldStyle(.roundedBorder).frame(width: 80)
+                    Button(L10n.tr("common.save")) {
                         guard !newKey.isEmpty,
                               let i = Double(newInput),
                               let o = Double(newOutput) else { return }
@@ -414,7 +432,7 @@ private struct PricingSettings: View {
             HStack(spacing: 6) {
                 Text(entry.model).font(.body.monospaced())
                 if override != nil {
-                    Text("已覆盖")
+                    Text(L10n.tr("pricing.overridden"))
                         .font(.caption2)
                         .padding(.horizontal, 6).padding(.vertical, 1)
                         .background(Capsule().fill(Color.orange.opacity(0.2)))
@@ -443,7 +461,7 @@ private struct PricingSettings: View {
                     Image(systemName: "square.and.pencil")
                 }
                 .buttonStyle(.borderless)
-                .help("把当前价格填入下方表单以便覆盖")
+                .help(L10n.tr("pricing.help.fill_form"))
 
                 if override != nil {
                     Button(role: .destructive) {
@@ -454,7 +472,7 @@ private struct PricingSettings: View {
                         Image(systemName: "arrow.uturn.backward")
                     }
                     .buttonStyle(.borderless)
-                    .help("移除覆盖，恢复内置单价")
+                    .help(L10n.tr("pricing.help.remove_override"))
                 }
             }
             .frame(width: 60, alignment: .trailing)
@@ -472,25 +490,25 @@ private struct DataSettings: View {
 
     var body: some View {
         Form {
-            Section("数据库") {
+            Section(L10n.tr("data.section.db")) {
                 HStack {
-                    Text("记录总数")
+                    Text(L10n.tr("data.records.total"))
                     Spacer()
                     Text("\(records.count)").monospacedDigit()
                 }
             }
-            Section("操作") {
-                Button("立即拉取一次") {
+            Section(L10n.tr("data.section.actions")) {
+                Button(L10n.tr("data.fetch_now")) {
                     appState.manualRefresh()
                 }
                 .disabled(appState.isRefreshing)
 
-                Button("导出 CSV") {
+                Button(L10n.tr("data.export_csv")) {
                     exportCSV()
                 }
             }
-            Section("路径") {
-                Text("数据存储于 macOS SwiftData 容器（沙盒内 ~/Library/Containers/com.tokenomics.Tokenomics）")
+            Section(L10n.tr("data.section.path")) {
+                Text(L10n.tr("data.path.desc"))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -521,16 +539,16 @@ private struct ProvidersSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("控制 App 中显示哪些供应商图标。隐藏后将从侧边栏、仪表盘汇总、API Keys 列表中移除。")
+            Text(L10n.tr("providers.intro"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
 
             TabView {
                 builtinList
-                    .tabItem { Text("内置") }
+                    .tabItem { Text(L10n.tr("providers.tab.builtin")) }
                 customList
-                    .tabItem { Text("自定义") }
+                    .tabItem { Text(L10n.tr("providers.tab.custom")) }
             }
         }
         .sheet(isPresented: $showingNew) {
@@ -555,7 +573,7 @@ private struct ProvidersSettings: View {
                         Circle().fill(Color(hex: p.brandColorHex)).frame(width: 12, height: 12)
                         Text(p.displayName)
                         Spacer()
-                        Toggle("显示", isOn: Binding(
+                        Toggle(L10n.tr("providers.toggle.show"), isOn: Binding(
                             get: { !appState.isProviderHidden(p.rawValue) },
                             set: { appState.setProviderHidden(p.rawValue, hidden: !$0) }
                         ))
@@ -574,18 +592,18 @@ private struct ProvidersSettings: View {
     private var customList: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("自定义供应商").font(.headline)
+                Text(L10n.tr("providers.custom.title")).font(.headline)
                 Spacer()
                 Button {
                     showingNew = true
                 } label: {
-                    Label("新增", systemImage: "plus")
+                    Label(L10n.tr("common.new"), systemImage: "plus")
                 }
             }
             .padding(.bottom, 8)
 
             if appState.customProviders.isEmpty {
-                Text("还没有自定义供应商。点击「新增」可以添加一个外部脚本端点。")
+                Text(L10n.tr("providers.custom.empty"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -598,14 +616,14 @@ private struct ProvidersSettings: View {
                                 Circle().fill(Color(hex: cp.colorHex)).frame(width: 12, height: 12)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(cp.name)
-                                    Text(cp.endpointURL.isEmpty ? "未配置端点" : cp.endpointURL)
+                                    Text(cp.endpointURL.isEmpty ? L10n.tr("providers.custom.no_endpoint") : cp.endpointURL)
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
                                         .truncationMode(.middle)
                                 }
                                 Spacer()
-                                Toggle("拉取", isOn: Binding(
+                                Toggle(L10n.tr("providers.toggle.collect"), isOn: Binding(
                                     get: { cp.isCollectionEnabled },
                                     set: { v in
                                         cp.isCollectionEnabled = v
@@ -613,8 +631,8 @@ private struct ProvidersSettings: View {
                                     }
                                 ))
                                 .toggleStyle(.checkbox)
-                                .help("启用后会按 5 分钟间隔自动拉取")
-                                Toggle("显示", isOn: Binding(
+                                .help(L10n.tr("providers.toggle.collect.help"))
+                                Toggle(L10n.tr("providers.toggle.show"), isOn: Binding(
                                     get: { !appState.isProviderHidden(cp.id) },
                                     set: { appState.setProviderHidden(cp.id, hidden: !$0) }
                                 ))
@@ -667,16 +685,16 @@ private struct CustomProviderEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(initial == nil ? "新增自定义供应商" : "编辑自定义供应商")
+            Text(initial == nil ? L10n.tr("custom.editor.new") : L10n.tr("custom.editor.edit"))
                 .font(.title3.bold())
                 .padding(.bottom, 8)
 
             ScrollView {
                 Form {
-                    Section("基础") {
-                        TextField("名称（显示用）", text: $name)
+                    Section(L10n.tr("custom.editor.section.basic")) {
+                        TextField(L10n.tr("custom.editor.name"), text: $name)
                         HStack {
-                            Text("颜色")
+                            Text(L10n.tr("custom.editor.color"))
                             Spacer()
                             ForEach(palette, id: \.self) { hex in
                                 Circle()
@@ -688,19 +706,19 @@ private struct CustomProviderEditor: View {
                                     .onTapGesture { colorHex = hex }
                             }
                         }
-                        Toggle("启用自动拉取", isOn: $isCollectionEnabled)
+                        Toggle(L10n.tr("custom.editor.enable_collect"), isOn: $isCollectionEnabled)
                     }
 
-                    Section("HTTP") {
-                        TextField("Endpoint URL", text: $endpointURL)
+                    Section(L10n.tr("custom.editor.section.http")) {
+                        TextField(L10n.tr("custom.editor.endpoint"), text: $endpointURL)
                             .textFieldStyle(.roundedBorder)
-                        Picker("方法", selection: $httpMethod) {
+                        Picker(L10n.tr("custom.editor.method"), selection: $httpMethod) {
                             Text("GET").tag("GET")
                             Text("POST").tag("POST")
                         }
                         .pickerStyle(.segmented)
                         VStack(alignment: .leading) {
-                            Text("Headers (JSON)").font(.caption).foregroundStyle(.secondary)
+                            Text(L10n.tr("custom.editor.headers")).font(.caption).foregroundStyle(.secondary)
                             TextEditor(text: $headersJSON)
                                 .font(.system(.body, design: .monospaced))
                                 .frame(height: 80)
@@ -708,7 +726,7 @@ private struct CustomProviderEditor: View {
                         }
                         if httpMethod == "POST" {
                             VStack(alignment: .leading) {
-                                Text("Body (JSON)").font(.caption).foregroundStyle(.secondary)
+                                Text(L10n.tr("custom.editor.body")).font(.caption).foregroundStyle(.secondary)
                                 TextEditor(text: $bodyJSON)
                                     .font(.system(.body, design: .monospaced))
                                     .frame(height: 60)
@@ -718,17 +736,17 @@ private struct CustomProviderEditor: View {
                     }
 
                     Section {
-                        TextField("记录数组路径 (recordsPath，留空表示根本身是数组)", text: $recordsPath)
-                        TextField("模型字段", text: $modelField)
-                        TextField("input tokens 字段", text: $inputTokensField)
-                        TextField("output tokens 字段", text: $outputTokensField)
-                        TextField("时间戳字段（可选）", text: $timestampField)
-                        TextField("费用 USD 字段（可选）", text: $costField)
-                        TextField("请求 ID 字段（可选，用于去重）", text: $requestIdField)
+                        TextField(L10n.tr("custom.editor.records_path"), text: $recordsPath)
+                        TextField(L10n.tr("custom.editor.model_field"), text: $modelField)
+                        TextField(L10n.tr("custom.editor.input_field"), text: $inputTokensField)
+                        TextField(L10n.tr("custom.editor.output_field"), text: $outputTokensField)
+                        TextField(L10n.tr("custom.editor.timestamp_field"), text: $timestampField)
+                        TextField(L10n.tr("custom.editor.cost_field"), text: $costField)
+                        TextField(L10n.tr("custom.editor.requestid_field"), text: $requestIdField)
                     } header: {
-                        Text("字段映射")
+                        Text(L10n.tr("custom.editor.section.mapping"))
                     } footer: {
-                        Text("路径语法：a.b[0].c  例：data.records 表示根对象 data 下的 records 数组")
+                        Text(L10n.tr("custom.editor.mapping.footer"))
                             .font(.caption2)
                     }
                 }
@@ -737,8 +755,8 @@ private struct CustomProviderEditor: View {
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
-                Button(initial == nil ? "添加" : "保存") {
+                Button(L10n.tr("common.cancel")) { dismiss() }
+                Button(initial == nil ? L10n.tr("common.add") : L10n.tr("common.save")) {
                     if let existing = initial {
                         existing.name = name
                         existing.colorHex = colorHex
@@ -757,7 +775,7 @@ private struct CustomProviderEditor: View {
                         onSave(existing)
                     } else {
                         let p = CustomProvider(
-                            name: name.isEmpty ? "未命名" : name,
+                            name: name.isEmpty ? L10n.tr("custom.editor.unnamed") : name,
                             colorHex: colorHex,
                             isVisible: true,
                             isCollectionEnabled: isCollectionEnabled,
@@ -816,15 +834,15 @@ private struct SubscriptionsSettings: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("订阅套餐").font(.headline)
-                    Text("添加你已订阅的 ChatGPT Plus / Claude Pro / Cursor Pro 等，用来在「回本没」页面计算回本率。")
+                    Text(L10n.tr("subs.title")).font(.headline)
+                    Text(L10n.tr("subs.desc"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button {
                     showingNew = true
                 } label: {
-                    Label("新增", systemImage: "plus")
+                    Label(L10n.tr("common.new"), systemImage: "plus")
                 }
             }
             .padding(.bottom, 12)
@@ -834,9 +852,9 @@ private struct SubscriptionsSettings: View {
                     Image(systemName: "creditcard.trianglebadge.exclamationmark")
                         .font(.system(size: 36))
                         .foregroundStyle(.secondary)
-                    Text("还没有订阅记录")
+                    Text(L10n.tr("subs.empty.title"))
                         .font(.subheadline)
-                    Text("点击右上角「新增」从预设套餐里挑选，或自定义月费。")
+                    Text(L10n.tr("subs.empty.desc"))
                         .font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -858,7 +876,7 @@ private struct SubscriptionsSettings: View {
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(String(format: "$%.2f / 月", sub.monthlyUSD))
+                                Text(L10n.tr("subs.monthly.fmt", sub.monthlyUSD))
                                     .monospacedDigit()
                                 Button { editing = sub } label: {
                                     Image(systemName: "pencil")
@@ -909,15 +927,15 @@ private struct SubscriptionEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(initial == nil ? "新增订阅" : "编辑订阅")
+            Text(initial == nil ? L10n.tr("subs.editor.new") : L10n.tr("subs.editor.edit"))
                 .font(.title3.bold())
                 .padding(.bottom, 12)
 
             Form {
                 if initial == nil {
-                    Section("快速选择预设") {
-                        Picker("预设套餐", selection: $selectedPresetID) {
-                            Text("（自定义）").tag(String?.none)
+                    Section(L10n.tr("subs.editor.preset_section")) {
+                        Picker(L10n.tr("subs.editor.preset_picker"), selection: $selectedPresetID) {
+                            Text(L10n.tr("subs.editor.preset_custom")).tag(String?.none)
                             ForEach(SubscriptionPreset.all) { p in
                                 Text("\(p.providerDisplayName) · \(p.planName)  $\(String(format: "%.0f", p.monthlyUSD))")
                                     .tag(Optional(p.id))
@@ -933,16 +951,16 @@ private struct SubscriptionEditor: View {
                     }
                 }
 
-                Section("基础信息") {
-                    Picker("供应商", selection: $providerKey) {
+                Section(L10n.tr("subs.editor.basic")) {
+                    Picker(L10n.tr("subs.editor.provider"), selection: $providerKey) {
                         ForEach(availableBuiltin) { p in
                             Text(p.displayName).tag(p.rawValue)
                         }
                     }
-                    TextField("套餐名（如 Plus / Pro / Max 20x）", text: $planName)
+                    TextField(L10n.tr("subs.editor.plan_name"), text: $planName)
                         .textFieldStyle(.roundedBorder)
                     HStack {
-                        Text("月费 (USD)")
+                        Text(L10n.tr("subs.editor.monthly_usd"))
                         Spacer()
                         TextField("0.00", text: $monthlyUSDText)
                             .textFieldStyle(.roundedBorder)
@@ -955,8 +973,8 @@ private struct SubscriptionEditor: View {
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
-                Button(initial == nil ? "添加" : "保存") {
+                Button(L10n.tr("common.cancel")) { dismiss() }
+                Button(initial == nil ? L10n.tr("common.add") : L10n.tr("common.save")) {
                     let usd = Double(monthlyUSDText.replacingOccurrences(of: ",", with: ".")) ?? 0
                     let trimmedName = planName.trimmingCharacters(in: .whitespaces)
                     guard usd > 0, !trimmedName.isEmpty else { return }
@@ -1003,13 +1021,13 @@ private struct QuotaSourcesSettings: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Claude 订阅额度采集").font(.headline)
-                    Text("Claude 的 5 小时 / 每周 额度可以从两条数据源拉取。OAuth 接口虽然官方，但被限流（HTTP 429）的几率高；浏览器 Cookie 路径走 claude.ai 网页 API，限流策略独立，是 OAuth 被限流时的兜底。")
+                    Text(L10n.tr("quota.title")).font(.headline)
+                    Text(L10n.tr("quota.desc"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                GroupBox("主路径") {
+                GroupBox(L10n.tr("quota.primary")) {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("", selection: Binding<Bool>(
                             get: { prefs.cookieAsPrimary },
@@ -1019,23 +1037,23 @@ private struct QuotaSourcesSettings: View {
                                 appState.updateClaudeQuotaPreferences(p)
                             }
                         )) {
-                            Text("OAuth 接口（默认）").tag(false)
-                            Text("浏览器 Cookie（绕开 OAuth 限流）").tag(true)
+                            Text(L10n.tr("quota.primary.oauth")).tag(false)
+                            Text(L10n.tr("quota.primary.cookie")).tag(true)
                         }
                         .pickerStyle(.radioGroup)
                         .labelsHidden()
                         Text(prefs.cookieAsPrimary
-                             ? "首选从本地浏览器读 claude.ai cookie，失败时回退到 OAuth。"
-                             : "首选 OAuth；遇到 429 / 401 时自动回退到浏览器 Cookie。")
+                             ? L10n.tr("quota.primary.cookie_desc")
+                             : L10n.tr("quota.primary.oauth_desc"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                GroupBox("浏览器优先级") {
+                GroupBox(L10n.tr("quota.browser.priority")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("从上到下尝试，先成功的浏览器优先使用其 cookie。点开关切换是否启用某个浏览器。")
+                        Text(L10n.tr("quota.browser.priority.desc"))
                             .font(.caption).foregroundStyle(.secondary)
                         ForEach(orderedBrowsers(), id: \.self) { browser in
                             HStack(spacing: 12) {
@@ -1067,13 +1085,13 @@ private struct QuotaSourcesSettings: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                GroupBox("连通性测试") {
+                GroupBox(L10n.tr("quota.test")) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button {
                                 runCookieProbe()
                             } label: {
-                                Label(probing ? "正在测试…" : "立即从浏览器读取 cookie",
+                                Label(probing ? L10n.tr("quota.test.running") : L10n.tr("quota.test.run"),
                                       systemImage: "key.viewfinder")
                             }
                             .disabled(probing)
@@ -1086,7 +1104,7 @@ private struct QuotaSourcesSettings: View {
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Text("第一次读取会弹出系统钥匙串授权，点「始终允许」即可。")
+                        Text(L10n.tr("quota.test.keychain_hint"))
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
@@ -1163,7 +1181,7 @@ private struct QuotaSourcesSettings: View {
                 switch result {
                 case .success(let c):
                     let suffix = String(c.sessionKey.suffix(6))
-                    probeResult = "✓ 已从 \(c.browser.displayName)/\(c.profile) 读到 sessionKey（…\(suffix)），host=\(c.hostKey)"
+                    probeResult = "✓ " + L10n.tr("quota.probe.success.fmt", c.browser.displayName, c.profile, suffix, c.hostKey)
                 case .failure(let e):
                     probeResult = "✗ \(e.localizedDescription)"
                 }

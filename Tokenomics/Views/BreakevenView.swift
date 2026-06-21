@@ -8,6 +8,9 @@ struct BreakevenView: View {
     @EnvironmentObject private var localization: LocalizationManager
     @Query(sort: \UsageRecord.timestamp, order: .reverse) private var records: [UsageRecord]
 
+    /// 由父视图（RootView）注入：点击「查看模型分布」时切换到模型分布侧边栏。
+    var onShowModels: (() -> Void)? = nil
+
     var body: some View {
         ScrollView(.vertical) {
             Group {
@@ -644,21 +647,28 @@ struct BreakevenView: View {
                 value: formatUSDCompact(stats.primaryCost)
             )
 
-            HStack {
-                Text(L10n.tr("breakeven.overview.view_models"))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(palette.deep)
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(palette.deep)
+            Button {
+                onShowModels?()
+            } label: {
+                HStack {
+                    Text(L10n.tr("breakeven.overview.view_models"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(palette.deep)
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(palette.deep)
+                }
+                .contentShape(Rectangle())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(palette.softBg)
+                )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(palette.softBg)
-            )
+            .buttonStyle(.plain)
+            .help(L10n.tr("breakeven.overview.view_models"))
 
             Spacer(minLength: 0)
         }

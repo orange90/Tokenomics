@@ -88,7 +88,7 @@ struct RootView: View {
         case .dashboard:
             DashboardView()
         case .breakeven:
-            BreakevenView()
+            BreakevenView(onShowModels: { selection = .models })
         case .provider(let p):
             ProviderDetailView(provider: p)
         case .customProvider(let key):

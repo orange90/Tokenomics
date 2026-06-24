@@ -7,10 +7,25 @@ struct DashboardView: View {
     @EnvironmentObject private var localization: LocalizationManager
     @Query(sort: \UsageRecord.timestamp, order: .reverse) private var records: [UsageRecord]
 
+    /// 顶部「5h 限额」框选中的供应商。默认 OpenAI。
+    @State private var fiveHourProvider: Provider = .openai
+    /// 由 TasksScanner 拉到的任务列表（仅用于顶部 5h 卡片按任务拆分）。
+    /// 拉取放在 .task 里异步执行，避免阻塞首屏。
+    @State private var taskSessions: [TaskSession] = []
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+
+                section(L10n.tr("dashboard.five_hour.section")) {
+                    FiveHourBreakdownCard(
+                        snapshot: appState.quotaSnapshots[snapshotKey(for: fiveHourProvider)],
+                        selectedProvider: fiveHourProvider,
+                        sessionsToday: sessionsToday(for: fiveHourProvider),
+                        onSelectProvider: { fiveHourProvider = $0 }
+                    )
+                }
 
                 if !appState.quotaSnapshots.isEmpty {
                     section(L10n.tr("dashboard.section.quota")) {
@@ -97,6 +112,40 @@ struct DashboardView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .id(localization.language.rawValue)
+        .task {
+            await reloadTaskSessions()
+        }
+    }
+
+    /// 后台扫描 Claude / Codex 的 jsonl 任务日志，仅用于顶部 5h 卡片的「按任务拆分」。
+    /// 与 TasksView 共用 TasksScanner，但这里不做 selection / sort 等交互。
+    private func reloadTaskSessions() async {
+        let pricing = appState.pricingService
+        let result = await Task.detached(priority: .utility) {
+            TasksScanner.scanAll(pricing: pricing)
+        }.value
+        self.taskSessions = result.sessions
+    }
+
+    /// 仅返回今天（startOfDay 之后）且属于指定 provider 的会话。
+    /// FiveHourBreakdownCard 内部还会按 5h 窗口起点二次过滤。
+    private func sessionsToday(for provider: Provider) -> [TaskSession] {
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        return taskSessions.filter { s in
+            guard s.provider == provider else { return false }
+            guard let ts = s.lastTimestamp else { return false }
+            return ts >= startOfToday
+        }
+    }
+
+    /// AppState.quotaSnapshots 的 key 是 probe id（"claude" / "codex"），
+    /// 这里把 Provider 反查回去。
+    private func snapshotKey(for p: Provider) -> String {
+        switch p {
+        case .anthropic: return "claude"
+        case .openai:    return "codex"
+        case .unknown:   return ""
+        }
     }
 
     // MARK: - Header

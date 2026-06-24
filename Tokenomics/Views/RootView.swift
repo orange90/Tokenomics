@@ -12,6 +12,7 @@ struct RootView: View {
         case provider(Provider)
         case customProvider(String)
         case models
+        case tasks
         case logs
 
         var id: String {
@@ -21,6 +22,7 @@ struct RootView: View {
             case .provider(let p): return "p-\(p.rawValue)"
             case .customProvider(let key): return "cp-\(key)"
             case .models: return "models"
+            case .tasks: return "tasks"
             case .logs: return "logs"
             }
         }
@@ -57,6 +59,8 @@ struct RootView: View {
                     .tag(SidebarItem.dashboard)
                 Label(L10n.tr("sidebar.models"), systemImage: "square.grid.2x2")
                     .tag(SidebarItem.models)
+                Label(L10n.tr("sidebar.tasks"), systemImage: "checklist")
+                    .tag(SidebarItem.tasks)
                 Label(L10n.tr("sidebar.logs"), systemImage: "doc.text")
                     .tag(SidebarItem.logs)
             }
@@ -99,6 +103,8 @@ struct RootView: View {
             }
         case .models:
             ModelBreakdownView()
+        case .tasks:
+            TasksView()
         case .logs:
             LogsView()
         }

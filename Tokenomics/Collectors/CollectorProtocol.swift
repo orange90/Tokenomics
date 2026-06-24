@@ -11,11 +11,20 @@ protocol UsageCollector: AnyObject {
     var isEnabled: Bool { get }
     /// 拉取自指定时间以来的用量。idempotent。
     func collect(since: Date?) async throws -> [UsageRecord]
+    /// 增量游标。Scheduler 在调用 collect 前注入上一次保存的 cursor，
+    /// collect 完成后读取最新值写回 CollectorState.cursorPayload。
+    /// 默认实现为 no-op，老 collector 不受影响。
+    var cursorPayload: String? { get set }
 }
 
 extension UsageCollector {
     var defaultSince: Date {
         Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    }
+
+    var cursorPayload: String? {
+        get { nil }
+        set { _ = newValue }
     }
 }
 

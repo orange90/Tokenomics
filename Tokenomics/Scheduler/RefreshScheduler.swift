@@ -61,6 +61,8 @@ final class RefreshScheduler {
             }
             let state = repository.loadState(collectorId: collector.id)
             let since = state?.lastRunAt
+            // 注入上一轮保存的增量游标（mtime + parsed size），让 collector 可以做 IO 短路。
+            collector.cursorPayload = state?.cursorPayload
             do {
                 let records = try await collector.collect(since: since)
                 // 计价补全（如果 Collector 没填 costUSD）
@@ -75,16 +77,19 @@ final class RefreshScheduler {
                     )
                 }
                 let inserted = repository.upsert(records)
-                let newState = CollectorState(
-                    collectorId: collector.id,
-                    lastRunAt: Date(),
-                    lastError: nil
-                )
+                let newCursor = collector.cursorPayload
                 if let existing = state {
                     existing.lastRunAt = Date()
                     existing.lastError = nil
+                    existing.cursorPayload = newCursor
                     try? repository.context.save()
                 } else {
+                    let newState = CollectorState(
+                        collectorId: collector.id,
+                        lastRunAt: Date(),
+                        lastError: nil,
+                        cursorPayload: newCursor
+                    )
                     repository.saveState(newState)
                 }
                 onLog("✓ \(collector.displayName)：拉取 \(records.count) 条，新增 \(inserted)")

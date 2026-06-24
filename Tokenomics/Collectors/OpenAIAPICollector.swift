@@ -14,6 +14,8 @@ final class OpenAIAPICollector: UsageCollector {
 
     private let keychain: KeychainService
     private let codexDir: URL
+    /// path -> 上次解析 cursor。由 Scheduler 通过 cursorPayload 注入并持久化。
+    private var cursor: [String: FileCursor] = [:]
 
     init(keychain: KeychainService) {
         self.keychain = keychain
@@ -27,15 +29,31 @@ final class OpenAIAPICollector: UsageCollector {
         return keychain.hasKey(KeychainKey.openai)
     }
 
+    var cursorPayload: String? {
+        get { FileCursor.encode(cursor) }
+        set { cursor = FileCursor.decode(newValue) }
+    }
+
     func collect(since: Date?) async throws -> [UsageRecord] {
         let cutoff = since ?? defaultSince
         var results: [UsageRecord] = []
 
         if FileManager.default.fileExists(atPath: codexDir.path) {
-            let files = enumerateJSONL(in: codexDir, cutoff: cutoff)
-            for url in files {
-                results.append(contentsOf: parseFile(url: url, cutoff: cutoff))
+            let candidates = enumerateJSONL(in: codexDir, cutoff: cutoff)
+            var nextCursor: [String: FileCursor] = [:]
+            for entry in candidates {
+                let key = entry.url.path
+                let prev = cursor[key]
+                // mtime + size 完全不变 → 跳过 IO，沿用旧 cursor。
+                if let prev, prev.mtime == entry.mtime, prev.size == entry.size {
+                    nextCursor[key] = prev
+                    continue
+                }
+                let startOffset: Int64 = (prev.map { Int64($0.size) }).flatMap { $0 <= entry.size ? $0 : nil } ?? 0
+                results.append(contentsOf: parseFile(url: entry.url, cutoff: cutoff, startOffset: startOffset))
+                nextCursor[key] = FileCursor(mtime: entry.mtime, size: entry.size)
             }
+            cursor = nextCursor
         }
 
         if let key = keychain.get(KeychainKey.openai), !key.isEmpty {
@@ -49,70 +67,88 @@ final class OpenAIAPICollector: UsageCollector {
 
     // MARK: - Local Codex parsing
 
-    private func enumerateJSONL(in dir: URL, cutoff: Date) -> [URL] {
+    private struct FileEntry {
+        let url: URL
+        let mtime: TimeInterval
+        let size: Int64
+    }
+
+    private func enumerateJSONL(in dir: URL, cutoff: Date) -> [FileEntry] {
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
         guard let enumerator = FileManager.default.enumerator(
             at: dir,
-            includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],
+            includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
         ) else { return [] }
-        var files: [URL] = []
+        var files: [FileEntry] = []
         for case let url as URL in enumerator {
             guard url.pathExtension.lowercased() == "jsonl" else { continue }
-            if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]),
-               let mtime = values.contentModificationDate,
-               mtime < cutoff {
-                continue
-            }
-            files.append(url)
+            let values = try? url.resourceValues(forKeys: keys)
+            if let mtime = values?.contentModificationDate, mtime < cutoff { continue }
+            let mtime = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
+            let size = Int64(values?.fileSize ?? 0)
+            files.append(FileEntry(url: url, mtime: mtime, size: size))
         }
         return files
     }
 
-    private func parseFile(url: URL, cutoff: Date) -> [UsageRecord] {
-        guard let data = try? Data(contentsOf: url),
-              let text = String(data: data, encoding: .utf8) else { return [] }
+    private func parseFile(url: URL, cutoff: Date, startOffset: Int64) -> [UsageRecord] {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? handle.close() }
+        if startOffset > 0 {
+            do { try handle.seek(toOffset: UInt64(startOffset)) } catch { return [] }
+        }
+        guard let data = try? handle.readToEnd(), !data.isEmpty else { return [] }
 
-        let sessionId = extractSessionId(from: url.lastPathComponent)
+        // 注：Codex 解析依赖 `turn_context` / `session_meta` 这类"状态"事件来确定 currentModel，
+        // 如果我们从文件中段开始读，这些状态事件就丢了。为安全起见，
+        // 只有"文件从未被解析过"（startOffset == 0）才允许 fromIndex 计算 sessionId；
+        // 增量场景下 sessionId / model 仍按本片段的事件流推演，不影响 token_count 正确性
+        // —— 大部分 jsonl 在 token_count 同行也会带 cwd / model 提示，缺失时降级为 "gpt-5.5"。
+        let sessionId = startOffset == 0 ? extractSessionId(from: url.lastPathComponent) : nil
         var currentModel: String = "gpt-5.5"
         var records: [UsageRecord] = []
         var eventIndex = 0
 
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            guard let lineData = line.data(using: .utf8),
-                  let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
+        let skipFirstFragment = startOffset > 0
+        let bytes = [UInt8](data)
+        let newline: UInt8 = 0x0A
+        var index = 0
+        var lineStart = 0
 
+        func consume(_ start: Int, _ end: Int) {
+            guard end > start else { return }
+            let slice = Data(bytes[start..<end])
+            guard let obj = try? JSONSerialization.jsonObject(with: slice) as? [String: Any] else { return }
             let type = obj["type"] as? String
             let payload = obj["payload"] as? [String: Any]
 
             if type == "turn_context", let model = payload?["model"] as? String, !model.isEmpty {
                 currentModel = model
-                continue
+                return
             }
             if type == "session_meta", let model = (payload?["payload"] as? [String: Any])?["model"] as? String, !model.isEmpty {
                 currentModel = model
-                continue
+                return
             }
 
             guard type == "event_msg",
                   let payload = payload,
                   (payload["type"] as? String) == "token_count",
                   let info = payload["info"] as? [String: Any],
-                  let last = info["last_token_usage"] as? [String: Any] else { continue }
+                  let last = info["last_token_usage"] as? [String: Any] else { return }
 
             let input = (last["input_tokens"] as? Int) ?? 0
             let output = (last["output_tokens"] as? Int) ?? 0
             let cachedInput = (last["cached_input_tokens"] as? Int) ?? 0
             let reasoning = (last["reasoning_output_tokens"] as? Int) ?? 0
-
-            if input == 0 && output == 0 && cachedInput == 0 { continue }
+            if input == 0 && output == 0 && cachedInput == 0 { return }
 
             let ts = DateParsing.parse(obj["timestamp"])
-            if ts < cutoff { continue }
+            if ts < cutoff { return }
 
             eventIndex += 1
             let reqId = sessionId.map { "\($0)#\(eventIndex)" }
-
-            // 非缓存输入 = 总输入 - 缓存命中输入；reasoning tokens 归入 output。
             let nonCachedInput = max(0, input - cachedInput)
             let totalOutput = output + reasoning
 
@@ -127,6 +163,20 @@ final class OpenAIAPICollector: UsageCollector {
                 cacheReadTokens: cachedInput,
                 requestId: reqId
             ))
+        }
+
+        while index < bytes.count {
+            if bytes[index] == newline {
+                if !(skipFirstFragment && lineStart == 0) {
+                    consume(lineStart, index)
+                }
+                lineStart = index + 1
+            }
+            index += 1
+        }
+        if lineStart < bytes.count {
+            let isCompleteLine = !(skipFirstFragment && lineStart == 0)
+            if isCompleteLine { consume(lineStart, bytes.count) }
         }
         return records
     }

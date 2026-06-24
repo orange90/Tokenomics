@@ -14,7 +14,11 @@ struct DashboardView: View {
     @State private var taskSessions: [TaskSession] = []
 
     var body: some View {
-        ScrollView {
+        // 一次遍历计算所有聚合（today / week / month / total / trend / byProvider / planUsage）。
+        // 相比原来 6+ 个 computed property 各自 O(N) filter + reduce，这里只扫一遍 records。
+        let agg = computeAggregates()
+        let summaries = providerSummaries(from: agg)
+        return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
@@ -35,7 +39,7 @@ struct DashboardView: View {
                                 QuotaCard(
                                     snapshot: item.snapshot,
                                     accent: item.accent,
-                                    usage: planUsage(for: item.snapshot.id),
+                                    usage: planUsage(for: item.snapshot.id, agg: agg),
                                     currency: appState.currency,
                                     usdCnyRate: appState.usdCnyRate
                                 )
@@ -50,27 +54,27 @@ struct DashboardView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 12) {
-                    CostCard(title: L10n.tr("dashboard.cost.today"), costUSD: sum(records: today),
-                             totalTokens: tokens(today),
+                    CostCard(title: L10n.tr("dashboard.cost.today"), costUSD: agg.todayCost,
+                             totalTokens: agg.todayTokens,
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .blue)
-                    CostCard(title: L10n.tr("dashboard.cost.week"), costUSD: sum(records: thisWeek),
-                             totalTokens: tokens(thisWeek),
+                    CostCard(title: L10n.tr("dashboard.cost.week"), costUSD: agg.weekCost,
+                             totalTokens: agg.weekTokens,
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .green)
-                    CostCard(title: L10n.tr("dashboard.cost.month"), costUSD: sum(records: thisMonth),
-                             totalTokens: tokens(thisMonth),
+                    CostCard(title: L10n.tr("dashboard.cost.month"), costUSD: agg.monthCost,
+                             totalTokens: agg.monthTokens,
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .orange)
-                    CostCard(title: L10n.tr("dashboard.cost.total"), costUSD: sum(records: records),
-                             totalTokens: tokens(records),
+                    CostCard(title: L10n.tr("dashboard.cost.total"), costUSD: agg.totalCost,
+                             totalTokens: agg.totalTokens,
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .pink)
                 }
 
                 section(L10n.tr("dashboard.section.trend")) {
                     UsageTrendChart(
-                        data: trendData(),
+                        data: agg.trend,
                         rate: appState.usdCnyRate,
                         currency: appState.currency
                     )
@@ -78,7 +82,7 @@ struct DashboardView: View {
 
                 section(L10n.tr("dashboard.section.by_provider")) {
                     VStack(spacing: 0) {
-                        ForEach(providerSummaries(), id: \.key) { item in
+                        ForEach(summaries, id: \.key) { item in
                             ProviderRow(
                                 providerKey: item.key,
                                 displayName: item.displayName,
@@ -91,7 +95,7 @@ struct DashboardView: View {
                             )
                             Divider()
                         }
-                        if providerSummaries().isEmpty {
+                        if summaries.isEmpty {
                             ContentUnavailableView(L10n.tr("dashboard.empty.title"), systemImage: "tray",
                                 description: Text(L10n.tr("dashboard.empty.desc")))
                                 .padding()
@@ -190,46 +194,122 @@ struct DashboardView: View {
 
     // MARK: - Aggregations
 
-    private var today: [UsageRecord] {
-        let start = Calendar.current.startOfDay(for: Date())
-        return records.filter { $0.timestamp >= start }
+    /// 一次遍历 records 同时填好 today / week (ISO weekOfYear) / month / total 的
+    /// cost 与 tokens，以及 (day × providerKey) 趋势桶、按 providerKey 的月度统计。
+    /// 所有时间窗口在循环外预先解析，循环里只做比较。
+    /// 相比原来 6+ 个 computed property 各自 O(N) filter + reduce，这里仅扫一遍 records。
+    private struct Aggregates {
+        var todayCost: Double = 0
+        var todayTokens: Int = 0
+        var weekCost: Double = 0
+        var weekTokens: Int = 0
+        var monthCost: Double = 0
+        var monthTokens: Int = 0
+        var totalCost: Double = 0
+        var totalTokens: Int = 0
+        /// 趋势图（近 14 天）按 day × provider 聚合的 cost。
+        var trend: [DailyCost] = []
+        /// 按 providerKey 的"近 30 天日历窗"统计：cost / tokens / record count。
+        var monthByProvider: [String: (cost: Double, tokens: Int, count: Int)] = [:]
+        /// 各 provider 在 today / lastWeek(滚动 7 天) / lastMonth(滚动 30 天) 的 cost & tokens。
+        var planByProvider: [String: PlanUsageStats] = [:]
     }
 
-    private var thisWeek: [UsageRecord] {
-        let now = Date()
-        let start = Calendar.current.dateInterval(of: .weekOfYear, for: now)?.start ?? now
-        return records.filter { $0.timestamp >= start }
-    }
-
-    private var thisMonth: [UsageRecord] {
-        let now = Date()
-        let start = Calendar.current.dateInterval(of: .month, for: now)?.start ?? now
-        return records.filter { $0.timestamp >= start }
-    }
-
-    private func sum(records: [UsageRecord]) -> Double { records.reduce(0) { $0 + $1.costUSD } }
-    private func tokens(_ records: [UsageRecord]) -> Int { records.reduce(0) { $0 + $1.totalTokens } }
-
-    private func trendData() -> [DailyCost] {
+    private func computeAggregates() -> Aggregates {
         let cal = Calendar.current
-        guard let cutoff = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) else { return [] }
-        let filtered = records.filter { $0.timestamp >= cutoff }
-        var grouped: [String: [UsageRecord]] = [:]
-        for r in filtered {
-            let day = cal.startOfDay(for: r.timestamp)
-            let key = "\(day.timeIntervalSince1970)|\(r.provider)"
-            grouped[key, default: []].append(r)
+        let now = Date()
+        let startOfToday = cal.startOfDay(for: now)
+        let weekStart = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? startOfToday
+        let monthStart = cal.dateInterval(of: .month, for: now)?.start ?? startOfToday
+        let trendCutoff = cal.date(byAdding: .day, value: -13, to: startOfToday) ?? startOfToday
+        // planUsage 用"滚动窗口"语义：近 7/30 天，与上面 ISO 周 / 自然月不冲突。
+        let last7Start = cal.date(byAdding: .day, value: -6, to: startOfToday) ?? startOfToday
+        let last30Start = cal.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
+
+        var agg = Aggregates()
+        // (dayEpoch, providerKey) -> cost
+        var trendBuckets: [String: Double] = [:]
+        // providerKey -> (todayCost, todayTokens, weekCost, weekTokens, monthCost, monthTokens)
+        var planBuckets: [String: (Double, Int, Double, Int, Double, Int)] = [:]
+
+        for r in records {
+            let ts = r.timestamp
+            let cost = r.costUSD
+            let tokens = r.totalTokens
+            agg.totalCost += cost
+            agg.totalTokens += tokens
+
+            if ts >= startOfToday {
+                agg.todayCost += cost
+                agg.todayTokens += tokens
+            }
+            if ts >= weekStart {
+                agg.weekCost += cost
+                agg.weekTokens += tokens
+            }
+            if ts >= monthStart {
+                agg.monthCost += cost
+                agg.monthTokens += tokens
+                var cur = agg.monthByProvider[r.provider] ?? (0, 0, 0)
+                cur.cost += cost
+                cur.tokens += tokens
+                cur.count += 1
+                agg.monthByProvider[r.provider] = cur
+            }
+            if ts >= trendCutoff {
+                let dayStart = cal.startOfDay(for: ts)
+                let key = "\(dayStart.timeIntervalSince1970)|\(r.provider)"
+                trendBuckets[key, default: 0] += cost
+            }
+            if ts >= last30Start {
+                var cur = planBuckets[r.provider] ?? (0, 0, 0, 0, 0, 0)
+                cur.4 += cost; cur.5 += tokens
+                if ts >= last7Start {
+                    cur.2 += cost; cur.3 += tokens
+                }
+                if ts >= startOfToday {
+                    cur.0 += cost; cur.1 += tokens
+                }
+                planBuckets[r.provider] = cur
+            }
         }
-        return grouped.map { k, recs -> DailyCost in
+
+        agg.trend = trendBuckets.map { k, v -> DailyCost in
             let parts = k.split(separator: "|")
             let ts = TimeInterval(parts[0]) ?? 0
-            let provider = String(parts[1])
-            let providerName = Provider(rawValue: provider)?.displayName ?? provider
+            let providerKey = String(parts[1])
+            let providerName = Provider(rawValue: providerKey)?.displayName ?? providerKey
             return DailyCost(day: Date(timeIntervalSince1970: ts),
                              provider: providerName,
-                             costUSD: recs.reduce(0) { $0 + $1.costUSD })
+                             costUSD: v)
+        }.sorted { $0.day < $1.day }
+
+        agg.planByProvider = planBuckets.mapValues { v in
+            PlanUsageStats(
+                todayCostUSD: v.0, todayTokens: v.1,
+                weekCostUSD: v.2, weekTokens: v.3,
+                monthCostUSD: v.4, monthTokens: v.5
+            )
         }
-        .sorted { $0.day < $1.day }
+        return agg
+    }
+
+    private func providerSummaries(from agg: Aggregates) -> [ProviderSummary] {
+        let customById = Dictionary(uniqueKeysWithValues: appState.customProviders.map { ($0.id, $0) })
+        return agg.monthByProvider.compactMap { key, value -> ProviderSummary? in
+            if appState.isProviderHidden(key) { return nil }
+            if let p = Provider(rawValue: key), p != .unknown {
+                return ProviderSummary(key: key, displayName: p.displayName, colorHex: p.brandColorHex,
+                                       cost: value.cost, tokens: value.tokens, count: value.count)
+            }
+            if let cp = customById[key] {
+                return ProviderSummary(key: key, displayName: cp.name, colorHex: cp.colorHex,
+                                       cost: value.cost, tokens: value.tokens, count: value.count)
+            }
+            return ProviderSummary(key: key, displayName: key, colorHex: Provider.unknown.brandColorHex,
+                                   cost: value.cost, tokens: value.tokens, count: value.count)
+        }
+        .sorted { $0.cost > $1.cost }
     }
 
     private struct ProviderSummary {
@@ -239,33 +319,6 @@ struct DashboardView: View {
         let cost: Double
         let tokens: Int
         let count: Int
-    }
-
-    private func providerSummaries() -> [ProviderSummary] {
-        var dict: [String: (Double, Int, Int)] = [:]
-        for r in thisMonth {
-            var cur = dict[r.provider] ?? (0, 0, 0)
-            cur.0 += r.costUSD
-            cur.1 += r.totalTokens
-            cur.2 += 1
-            dict[r.provider] = cur
-        }
-        let customById = Dictionary(uniqueKeysWithValues: appState.customProviders.map { ($0.id, $0) })
-        return dict.compactMap { key, value -> ProviderSummary? in
-            if appState.isProviderHidden(key) { return nil }
-            if let p = Provider(rawValue: key), p != .unknown {
-                return ProviderSummary(key: key, displayName: p.displayName, colorHex: p.brandColorHex,
-                                       cost: value.0, tokens: value.1, count: value.2)
-            }
-            if let cp = customById[key] {
-                return ProviderSummary(key: key, displayName: cp.name, colorHex: cp.colorHex,
-                                       cost: value.0, tokens: value.1, count: value.2)
-            }
-            // 既不是内置也不是自定义（可能是历史遗留），用 unknown 兜底
-            return ProviderSummary(key: key, displayName: key, colorHex: Provider.unknown.brandColorHex,
-                                   cost: value.0, tokens: value.1, count: value.2)
-        }
-        .sorted { $0.cost > $1.cost }
     }
 
     private let timeFmt: DateFormatter = {
@@ -321,36 +374,10 @@ struct DashboardView: View {
     }
 
     /// 计算某个 Plan（按 probe id 区分）在今日 / 近 7 天 / 近 30 天的用量。
-    /// 时间窗口以「日历自然日」为基准：今日=startOfDay(now)，
-    /// 近 7 天 = startOfDay(now) - 6 天起到现在，近 30 天同理 - 29 天。
-    private func planUsage(for probeID: String) -> PlanUsageStats {
+    /// 不再单独扫一遍 records；直接从 computeAggregates() 已经填好的 planByProvider 取桶。
+    private func planUsage(for probeID: String, agg: Aggregates) -> PlanUsageStats {
         guard let key = providerKey(forProbeID: probeID) else { return .zero }
-        let cal = Calendar.current
-        let startOfToday = cal.startOfDay(for: Date())
-        let week  = cal.date(byAdding: .day, value: -6,  to: startOfToday) ?? startOfToday
-        let month = cal.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
-
-        var todayCost = 0.0, todayTokens = 0
-        var weekCost  = 0.0, weekTokens  = 0
-        var monthCost = 0.0, monthTokens = 0
-        for r in records where r.provider == key {
-            if r.timestamp < month { continue }
-            monthCost += r.costUSD
-            monthTokens += r.totalTokens
-            if r.timestamp >= week {
-                weekCost += r.costUSD
-                weekTokens += r.totalTokens
-            }
-            if r.timestamp >= startOfToday {
-                todayCost += r.costUSD
-                todayTokens += r.totalTokens
-            }
-        }
-        return PlanUsageStats(
-            todayCostUSD: todayCost, todayTokens: todayTokens,
-            weekCostUSD: weekCost, weekTokens: weekTokens,
-            monthCostUSD: monthCost, monthTokens: monthTokens
-        )
+        return agg.planByProvider[key] ?? .zero
     }
 }
 

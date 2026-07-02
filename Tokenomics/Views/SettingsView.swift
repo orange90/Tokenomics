@@ -476,6 +476,16 @@ private struct DataSettings: View {
     @EnvironmentObject private var appState: AppState
     @Query private var records: [UsageRecord]
 
+    /// 月度账单 / 月度 CSV / Markdown 摘要使用的目标月份。默认是当前月。
+    @State private var selectedMonth: Date = {
+        Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
+    }()
+    @State private var lastExportMessage: String?
+    @State private var includeMonthlySummaryInJSON: Bool = true
+
+    /// 给账单 PDF 上打印的「账户 / 团队」名（可选）。
+    @State private var accountName: String = ""
+
     var body: some View {
         Form {
             Section(L10n.tr("data.section.db")) {
@@ -485,16 +495,73 @@ private struct DataSettings: View {
                     Text("\(records.count)").monospacedDigit()
                 }
             }
+
             Section(L10n.tr("data.section.actions")) {
                 Button(L10n.tr("data.fetch_now")) {
                     appState.manualRefresh()
                 }
                 .disabled(appState.isRefreshing)
+            }
 
-                Button(L10n.tr("data.export_csv")) {
-                    exportCSV()
+            Section(L10n.tr("data.section.export.raw")) {
+                Text(L10n.tr("data.export.raw.desc"))
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Button(L10n.tr("data.export_csv")) { exportRawCSV() }
+                    Button(L10n.tr("data.export_json")) { exportRawJSON() }
+                    Toggle(L10n.tr("data.export.json.include_monthly"), isOn: $includeMonthlySummaryInJSON)
+                        .toggleStyle(.checkbox)
+                        .help(L10n.tr("data.export.json.include_monthly.help"))
                 }
             }
+
+            Section(L10n.tr("data.section.export.monthly")) {
+                Text(L10n.tr("data.export.monthly.desc"))
+                    .font(.caption).foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    Text(L10n.tr("data.export.monthly.month"))
+                    MonthPicker(selection: $selectedMonth)
+                        .frame(width: 200)
+                    Spacer()
+                }
+
+                HStack(spacing: 12) {
+                    Text(L10n.tr("data.export.monthly.account"))
+                    TextField(L10n.tr("data.export.monthly.account.placeholder"),
+                              text: $accountName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        exportMonthlyPDF()
+                    } label: {
+                        Label(L10n.tr("data.export.monthly.pdf"), systemImage: "doc.richtext")
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        exportMonthlyCSV()
+                    } label: {
+                        Label(L10n.tr("data.export.monthly.csv"), systemImage: "tablecells")
+                    }
+
+                    Button {
+                        copyMonthlyMarkdown()
+                    } label: {
+                        Label(L10n.tr("data.export.monthly.copy_md"), systemImage: "doc.on.clipboard")
+                    }
+                }
+
+                if let msg = lastExportMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section(L10n.tr("data.section.path")) {
                 Text(L10n.tr("data.path.desc"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -503,16 +570,130 @@ private struct DataSettings: View {
         .formStyle(.grouped)
     }
 
-    private func exportCSV() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "tokenomics-export.csv"
-        panel.allowedContentTypes = [.commaSeparatedText]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        var csv = "timestamp,provider,model,source,inputTokens,outputTokens,cacheCreation,cacheRead,costUSD\n"
-        for r in records {
-            csv += "\(ISO8601DateFormatter().string(from: r.timestamp)),\(r.provider),\(r.model),\(r.sourceApp),\(r.inputTokens),\(r.outputTokens),\(r.cacheCreationTokens),\(r.cacheReadTokens),\(r.costUSD)\n"
+    // MARK: - Helpers
+
+    private var monthLabel: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f.string(from: selectedMonth)
+    }
+
+    private func providerDisplayName(_ key: String) -> String {
+        if let p = Provider(rawValue: key), p != .unknown {
+            return p.displayName
         }
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
+        if let cp = appState.customProviders.first(where: { $0.id == key }) {
+            return cp.name
+        }
+        return key
+    }
+
+    private func buildReport() -> ReportExporter.MonthlyReport {
+        ReportExporter.buildMonthlyReport(
+            records: records,
+            month: selectedMonth,
+            providerDisplay: providerDisplayName(_:)
+        )
+    }
+
+    // MARK: - Actions
+
+    private func exportRawCSV() {
+        let csv = ReportExporter.makeCSV(records: records)
+        ReportExporter.saveWithPanel(
+            suggestedName: "tokenomics-export.csv",
+            contentTypes: [.commaSeparatedText]
+        ) { url in
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+            lastExportMessage = L10n.tr("data.export.saved.fmt", url.path)
+        }
+    }
+
+    private func exportRawJSON() {
+        let report = includeMonthlySummaryInJSON ? buildReport() : nil
+        let data = ReportExporter.makeJSON(records: records, monthlyReport: report,
+                                           rate: appState.usdCnyRate)
+        ReportExporter.saveWithPanel(
+            suggestedName: "tokenomics-export.json",
+            contentTypes: [.json]
+        ) { url in
+            try data.write(to: url, options: .atomic)
+            lastExportMessage = L10n.tr("data.export.saved.fmt", url.path)
+        }
+    }
+
+    private func exportMonthlyPDF() {
+        let report = buildReport()
+        let pdf = ReportExporter.makeMonthlyPDF(
+            report: report,
+            currency: appState.currency,
+            rate: appState.usdCnyRate,
+            accountName: accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : accountName
+        )
+        ReportExporter.saveWithPanel(
+            suggestedName: "tokenomics-\(report.monthLabel).pdf",
+            contentTypes: [.pdf]
+        ) { url in
+            try pdf.write(to: url, options: .atomic)
+            lastExportMessage = L10n.tr("data.export.saved.fmt", url.path)
+        }
+    }
+
+    private func exportMonthlyCSV() {
+        let report = buildReport()
+        let csv = ReportExporter.makeMonthlyCSV(report: report, rate: appState.usdCnyRate)
+        ReportExporter.saveWithPanel(
+            suggestedName: "tokenomics-\(report.monthLabel)-summary.csv",
+            contentTypes: [.commaSeparatedText]
+        ) { url in
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+            lastExportMessage = L10n.tr("data.export.saved.fmt", url.path)
+        }
+    }
+
+    private func copyMonthlyMarkdown() {
+        let report = buildReport()
+        let md = ReportExporter.makeMonthlyMarkdown(
+            report: report,
+            currency: appState.currency,
+            rate: appState.usdCnyRate
+        )
+        ReportExporter.copyToPasteboard(md)
+        lastExportMessage = L10n.tr("data.export.copied.md.fmt", monthLabel)
+    }
+}
+
+/// 月份选择器：用 menu 列出最近 24 个月。
+/// 不用 DatePicker(.compact) 的原因是它最细只能到 day，UI 上还要再点几次才能定位月。
+private struct MonthPicker: View {
+    @Binding var selection: Date
+
+    private var options: [Date] {
+        let cal = Calendar.current
+        let now = Date()
+        let curStart = cal.dateInterval(of: .month, for: now)?.start ?? now
+        var list: [Date] = []
+        for i in 0..<24 {
+            if let d = cal.date(byAdding: .month, value: -i, to: curStart) {
+                list.append(d)
+            }
+        }
+        return list
+    }
+
+    private static let fmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
+    var body: some View {
+        Picker("", selection: $selection) {
+            ForEach(options, id: \.self) { d in
+                Text(Self.fmt.string(from: d)).tag(d)
+            }
+        }
+        .labelsHidden()
     }
 }
 

@@ -12,6 +12,8 @@ struct DashboardView: View {
     /// 由 TasksScanner 拉到的任务列表（仅用于顶部 5h 卡片按任务拆分）。
     /// 拉取放在 .task 里异步执行，避免阻塞首屏。
     @State private var taskSessions: [TaskSession] = []
+    /// 顶部「复制本月汇总 Markdown」按钮的瞬时反馈气泡。
+    @State private var showCopiedHint: Bool = false
 
     var body: some View {
         // 一次遍历计算所有聚合（today / week / month / total / trend / byProvider / planUsage）。
@@ -70,6 +72,48 @@ struct DashboardView: View {
                              totalTokens: agg.totalTokens,
                              currency: appState.currency, rate: appState.usdCnyRate,
                              accent: .pink)
+                }
+
+                section(L10n.tr("dashboard.section.cache_hit")) {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        CacheHitRatioCard(
+                            title: L10n.tr("dashboard.cost.today"),
+                            ratio: agg.todayCache.hitRatio,
+                            cacheReadTokens: agg.todayCache.cacheRead,
+                            cacheWriteTokens: agg.todayCache.cacheWrite,
+                            inputTokens: agg.todayCache.input,
+                            accent: .blue
+                        )
+                        CacheHitRatioCard(
+                            title: L10n.tr("dashboard.cost.week"),
+                            ratio: agg.weekCache.hitRatio,
+                            cacheReadTokens: agg.weekCache.cacheRead,
+                            cacheWriteTokens: agg.weekCache.cacheWrite,
+                            inputTokens: agg.weekCache.input,
+                            accent: .green
+                        )
+                        CacheHitRatioCard(
+                            title: L10n.tr("dashboard.cost.month"),
+                            ratio: agg.monthCache.hitRatio,
+                            cacheReadTokens: agg.monthCache.cacheRead,
+                            cacheWriteTokens: agg.monthCache.cacheWrite,
+                            inputTokens: agg.monthCache.input,
+                            accent: .orange
+                        )
+                        CacheHitRatioCard(
+                            title: L10n.tr("dashboard.cost.total"),
+                            ratio: agg.totalCache.hitRatio,
+                            cacheReadTokens: agg.totalCache.cacheRead,
+                            cacheWriteTokens: agg.totalCache.cacheWrite,
+                            inputTokens: agg.totalCache.input,
+                            accent: .pink
+                        )
+                    }
                 }
 
                 section(L10n.tr("dashboard.section.trend")) {
@@ -165,6 +209,24 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button {
+                copyMonthlyMarkdown()
+            } label: {
+                Label(L10n.tr("dashboard.copy_md"), systemImage: "doc.on.clipboard")
+            }
+            .help(L10n.tr("dashboard.copy_md.help"))
+            .overlay(alignment: .bottomTrailing) {
+                if showCopiedHint {
+                    Text(L10n.tr("dashboard.copy_md.copied"))
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.green.opacity(0.85)))
+                        .foregroundStyle(.white)
+                        .offset(y: 20)
+                        .transition(.opacity)
+                }
+            }
             Picker(L10n.tr("dashboard.picker.currency"), selection: Binding(
                 get: { appState.currency },
                 set: { appState.updateCurrency($0) }
@@ -176,6 +238,37 @@ struct DashboardView: View {
             .pickerStyle(.segmented)
             .frame(width: 320)
         }
+    }
+
+    /// 把本月汇总打包成 Markdown 拷贝到剪贴板。
+    /// 复用设置页里的 ReportExporter，保证一处生成两处一致。
+    private func copyMonthlyMarkdown() {
+        let report = ReportExporter.buildMonthlyReport(
+            records: records,
+            month: Date(),
+            providerDisplay: providerDisplayName(_:)
+        )
+        let md = ReportExporter.makeMonthlyMarkdown(
+            report: report,
+            currency: appState.currency,
+            rate: appState.usdCnyRate
+        )
+        ReportExporter.copyToPasteboard(md)
+        withAnimation { showCopiedHint = true }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            withAnimation { showCopiedHint = false }
+        }
+    }
+
+    private func providerDisplayName(_ key: String) -> String {
+        if let p = Provider(rawValue: key), p != .unknown {
+            return p.displayName
+        }
+        if let cp = appState.customProviders.first(where: { $0.id == key }) {
+            return cp.name
+        }
+        return key
     }
 
     @ViewBuilder
@@ -207,12 +300,35 @@ struct DashboardView: View {
         var monthTokens: Int = 0
         var totalCost: Double = 0
         var totalTokens: Int = 0
+        /// 各时间窗口下，用于 Cache 命中率统计的三类 token（input / cacheWrite / cacheRead）。
+        /// 命中率定义：cacheRead / (input + cacheRead + cacheWrite)。output 不参与分母，
+        /// 因为 prompt caching 只影响输入侧 token 计费。
+        var todayCache = CacheTokenStats()
+        var weekCache  = CacheTokenStats()
+        var monthCache = CacheTokenStats()
+        var totalCache = CacheTokenStats()
         /// 趋势图（近 14 天）按 day × provider 聚合的 cost。
         var trend: [DailyCost] = []
         /// 按 providerKey 的"近 30 天日历窗"统计：cost / tokens / record count。
         var monthByProvider: [String: (cost: Double, tokens: Int, count: Int)] = [:]
         /// 各 provider 在 today / lastWeek(滚动 7 天) / lastMonth(滚动 30 天) 的 cost & tokens。
         var planByProvider: [String: PlanUsageStats] = [:]
+    }
+
+    /// Cache 命中率原始计数桶。
+    private struct CacheTokenStats {
+        var input: Int = 0
+        var cacheWrite: Int = 0
+        var cacheRead: Int = 0
+
+        /// 分母：所有进入"输入侧"的 token；output 不算。
+        var denominator: Int { input + cacheWrite + cacheRead }
+        /// 0...1 之间的命中率；样本不足时返回 nil 由 UI 展示占位。
+        var hitRatio: Double? {
+            let d = denominator
+            guard d > 0 else { return nil }
+            return Double(cacheRead) / Double(d)
+        }
     }
 
     private func computeAggregates() -> Aggregates {
@@ -236,20 +352,35 @@ struct DashboardView: View {
             let ts = r.timestamp
             let cost = r.costUSD
             let tokens = r.totalTokens
+            let inTok = r.inputTokens
+            let cwTok = r.cacheCreationTokens
+            let crTok = r.cacheReadTokens
             agg.totalCost += cost
             agg.totalTokens += tokens
+            agg.totalCache.input += inTok
+            agg.totalCache.cacheWrite += cwTok
+            agg.totalCache.cacheRead += crTok
 
             if ts >= startOfToday {
                 agg.todayCost += cost
                 agg.todayTokens += tokens
+                agg.todayCache.input += inTok
+                agg.todayCache.cacheWrite += cwTok
+                agg.todayCache.cacheRead += crTok
             }
             if ts >= weekStart {
                 agg.weekCost += cost
                 agg.weekTokens += tokens
+                agg.weekCache.input += inTok
+                agg.weekCache.cacheWrite += cwTok
+                agg.weekCache.cacheRead += crTok
             }
             if ts >= monthStart {
                 agg.monthCost += cost
                 agg.monthTokens += tokens
+                agg.monthCache.input += inTok
+                agg.monthCache.cacheWrite += cwTok
+                agg.monthCache.cacheRead += crTok
                 var cur = agg.monthByProvider[r.provider] ?? (0, 0, 0)
                 cur.cost += cost
                 cur.tokens += tokens

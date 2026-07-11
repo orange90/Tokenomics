@@ -55,10 +55,24 @@ final class AppState: ObservableObject {
     /// 改动会通过 quotaService 闭包实时生效，无需重建 service。
     @Published var claudeQuotaPreferences: ClaudeQuotaPreferences = .default
 
+    /// Claude 降级/加标检测最近 24h 的整体健康度。UI 用它给 DowngradeCard 打灯。
+    @Published var downgradeHealth: DowngradeVerdict = .clean
+
+    /// 是否启用 Claude 降级探测（主动 canary）。默认关闭，因为会消耗 token。
+    @Published var downgradeProbeEnabled: Bool = false
+
+    /// Claude Desktop 隐写术 / 浏览器注入检测协调器。
+    /// 常驻实例，UI 通过 `app.stegoProbe.latestReport` 等属性读取。
+    /// 借 `stegoProbeCancellable` 把嵌套 ObservableObject 的变化转发到 AppState。
+    let stegoProbe: ClaudeStegoProbe = ClaudeStegoProbe()
+    private var stegoProbeCancellable: AnyCancellable?
+
     private(set) var pricingService: PricingService = PricingService()
     private(set) var exchangeRateService: ExchangeRateService = ExchangeRateService()
     private(set) var keychain: KeychainService = KeychainService()
     private(set) var repository: UsageRepository?
+    private(set) var downgradeRepository: DowngradeRepository?
+    private(set) var downgradeProbe: ClaudeDowngradeProbe?
     private(set) var scheduler: RefreshScheduler?
     private(set) lazy var quotaService: QuotaService = QuotaService(
         claudePreferences: { [weak self] in
@@ -71,6 +85,11 @@ final class AppState: ObservableObject {
     @AppStorage("tc.preferredAppearance") private var preferredAppearanceRaw: String = AppearanceMode.system.rawValue
     @AppStorage("tc.subscriptions") private var subscriptionsRaw: String = ""
     @AppStorage("tc.claudeQuotaPrefs") private var claudeQuotaPrefsRaw: String = ""
+    @AppStorage("tc.downgradeProbeEnabled") private var downgradeProbeEnabledRaw: Bool = false
+
+    /// 主动探测的最小间隔（秒）。默认 6h，用户可在 SettingsView 里修改。
+    @AppStorage("tc.downgradeProbeIntervalSec") var downgradeProbeIntervalSec: Int = 6 * 3600
+    @Published private(set) var lastDowngradeProbeAt: Date?
 
     func bootstrap(modelContext: ModelContext) async {
         // 1. 读取偏好
@@ -86,6 +105,28 @@ final class AppState: ObservableObject {
 
         // 2.1 读取自定义供应商
         self.customProviders = repo.fetchAllCustomProviders()
+
+        // 2.2 初始化降级检测仓库 + 探针
+        let downgradeRepo = DowngradeRepository(context: modelContext)
+        self.downgradeRepository = downgradeRepo
+        self.downgradeProbe = ClaudeDowngradeProbe(
+            keychain: keychain,
+            repository: downgradeRepo,
+            onLog: { [weak self] msg in
+                Task { @MainActor in self?.appendStatus(msg) }
+            }
+        )
+        self.downgradeProbeEnabled = downgradeProbeEnabledRaw
+        self.downgradeHealth = downgradeRepo.currentHealth()
+
+        // 2.3 隐写术检测：把 probe 的日志接到 statusMessages，把嵌套 objectWillChange
+        //     转发出来，这样 SwiftUI 视图只订阅 AppState 也能感知内部状态变化。
+        stegoProbe.setLogger { [weak self] msg in
+            Task { @MainActor in self?.appendStatus(msg) }
+        }
+        stegoProbeCancellable = stegoProbe.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor in self?.objectWillChange.send() }
+        }
 
         // 3. 加载定价表
         let loaded = pricingService.loadBuiltinTable()
@@ -125,6 +166,7 @@ final class AppState: ObservableObject {
             },
             onCycleComplete: { [weak self] forced in
                 await self?.refreshQuotas(force: forced)
+                await self?.tickDowngradeProbe(force: forced)
             }
         )
         self.scheduler = scheduler
@@ -163,6 +205,7 @@ final class AppState: ObservableObject {
             },
             onCycleComplete: { [weak self] forced in
                 await self?.refreshQuotas(force: forced)
+                await self?.tickDowngradeProbe(force: forced)
             }
         )
         self.scheduler = newScheduler
@@ -364,4 +407,45 @@ final class AppState: ObservableObject {
         f.dateFormat = "HH:mm:ss"
         return f
     }()
+
+    // MARK: - Claude 降级探测
+
+    /// 按最小间隔调度一次 Claude 主动降级探测。
+    /// - Parameter force: 用户手动触发时 true，绕过间隔限流。
+    func tickDowngradeProbe(force: Bool = false) async {
+        guard downgradeProbeEnabled, let probe = downgradeProbe, probe.isAvailable else { return }
+        let interval = max(3600, TimeInterval(downgradeProbeIntervalSec))  // 硬下限 1h
+        if !force, let last = lastDowngradeProbeAt,
+           Date().timeIntervalSince(last) < interval {
+            return
+        }
+        lastDowngradeProbeAt = Date()
+        appendStatus("开始 Claude 降级探测（金标 canary）")
+        let n = await probe.runOnce()
+        if let repo = downgradeRepository {
+            self.downgradeHealth = repo.currentHealth()
+        }
+        appendStatus("Claude 降级探测：写入 \(n) 条事件，健康度 \(downgradeHealth.rawValue)")
+    }
+
+    /// 手动触发一次探测，不受间隔限制。
+    func runDowngradeProbeNow() {
+        Task { await tickDowngradeProbe(force: true) }
+    }
+
+    func setDowngradeProbeEnabled(_ enabled: Bool) {
+        downgradeProbeEnabled = enabled
+        downgradeProbeEnabledRaw = enabled
+    }
+
+    func resetDowngradeBaseline() {
+        downgradeProbe?.resetBaseline()
+        appendStatus("Claude 降级探测：基线已重置")
+    }
+
+    func refreshDowngradeHealth() {
+        if let repo = downgradeRepository {
+            downgradeHealth = repo.currentHealth()
+        }
+    }
 }

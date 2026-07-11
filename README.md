@@ -8,15 +8,16 @@
 
 ## 中文
 
-> 一款原生 macOS 应用，统一统计本机 Claude Code、OpenAI / Codex、Anthropic 的 token 用量与对应 USD / CNY 花费，并支持通过自定义脚本/接口接入其他来源。
+> 一款原生 macOS 应用，统一统计本机各 AI 工具（Claude Code / OpenAI / Anthropic）的 token 用量与对应 USD / CNY 花费，并支持自定义脚本接入任意来源。
 
 ### 功能特性
 
-- 📊 **统一仪表盘** — 今日 / 本周 / 本月 / 累计花费与趋势一目了然，支持模型维度拆解、配额卡片、回本分析
+- 📊 **统一仪表盘** — 今日 / 本周 / 本月 / 累计花费与趋势一目了然，支持模型维度拆解、配额卡片、缓存命中率、5 小时窗口拆解、回本分析
+- 🧩 **任务级视图** — [TasksView](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views/TasksView.swift) 直接解析 `~/.claude/projects/<cwd>/<sessionId>.jsonl`，按项目 / 会话粒度查看 token、费用、模型分布
 - 🔌 **多源采集**
-  - 本地日志解析：Claude Code (`~/.claude/projects`)、Codex CLI / Codex Desktop (`~/.codex/sessions`)
-  - 官方 API 拉取：Anthropic Admin Usage API、OpenAI Organization Usage API
-  - 自定义脚本/接口采集（CustomScriptCollector）：用任意 HTTP 接口或脚本输出 JSON 即可接入其他来源
+  - 本地日志解析：Claude Code (`~/.claude/projects`)
+  - 官方 API 拉取：OpenAI、Anthropic
+  - 自定义脚本/接口采集（[CustomScriptCollector](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Collectors/CustomScriptCollector.swift)）：用任意 HTTP 接口或脚本输出 JSON 即可接入其他来源
 - 💰 **精准计价** — 内置最新模型单价表（详见 [PricingTable.json](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Resources/PricingTable.json)），按 input / output / cache write / cache read 分别计算；支持单价覆盖
 - 📈 **配额探测** — Claude 订阅配额（Web / OAuth / Composite 多通道）与 Codex 配额实时回显
 - 💱 **多币种** — USD / CNY 切换，自动汇率（见 [ExchangeRateService.swift](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Pricing/ExchangeRateService.swift)）
@@ -43,13 +44,13 @@ Tokenomics/
 ├── Storage/                     # 持久化 / Keychain
 ├── Scheduler/                   # 后台刷新调度
 ├── Resources/                   # 单价表、Assets
-└── Views/                       # SwiftUI 界面
+└── Views/                       # SwiftUI 界面（仪表盘 / 回本 / 模型 / 任务 / 日志 / 设置）
 ```
 
 关键目录速览：
 
 - [Collectors](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Collectors) — 所有采集器实现
-- [Views](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views) — 仪表盘、Provider 详情、模型拆解、回本分析、设置
+- [Views](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views) — 仪表盘、回本分析、Provider 详情、模型拆解、任务详情、设置
 - [Models](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Models) — `UsageRecord`、`Provider`、`Subscription`、`ModelPricing` 等
 
 ### 在 Xcode 中打开
@@ -68,38 +69,11 @@ open Tokenomics.xcodeproj
 ```
 
 > 若不想安装 XcodeGen，可直接用 Xcode 新建一个 macOS App 项目，把 `Tokenomics/` 下的所有文件拖入项目即可运行。
->
-> 注意：App Sandbox **必须保持关闭**——沙盒应用读不到 Claude CLI 写在 login keychain 中的 `Claude Code-credentials`，也访问不了 `~/.claude` 目录。详见 [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L33-L41)。
 
-### 打包发布 DMG（免费方案，无需 Apple 开发者账号）
+### 签名与 App Sandbox
 
-仓库内附 [release.sh](file:///Users/huangzhe/Documents/Tokenomics/scripts/release.sh)，使用 **ad-hoc 签名**（identity = `-`）+ Hardened Runtime，本地一行命令即可产出可分发的 DMG：
-
-```bash
-# 一次性：把 xcode-select 切到 Xcode.app（不是 Command Line Tools）
-sudo xcode-select -s /Applications/Xcode.app
-
-# 可选：更漂亮的 DMG 排版
-brew install create-dmg
-
-# 打包（自动读取 project.yml 的 MARKETING_VERSION，也可手动指定）
-./scripts/release.sh
-./scripts/release.sh 0.2.0
-```
-
-产物：
-
-- `build/export/Tokenomics.app`
-- `build/Tokenomics-<version>.dmg`
-
-### 安装（给最终用户）
-
-由于没有付费 Apple Developer ID，Gatekeeper 首次会提示「无法验证开发者」，二选一即可：
-
-1. **右键打开法**：在 Applications 里 **右键 Tokenomics.app → 打开**，弹窗里再点一次「打开」，以后双击即可。
-2. **一行命令法**：终端执行 `xattr -dr com.apple.quarantine /Applications/Tokenomics.app`，之后双击直接进。
-
-> 升级到新版本后，可能需要再次执行上述任一操作（ad-hoc 签名的 cdhash 每次构建会变）。
+- **App Sandbox 必须保持关闭** —— 沙盒应用读不到 Claude CLI 写在 login keychain 中的 `Claude Code-credentials`，也访问不了 `~/.claude` 目录。详见 [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L36-L41)。
+- **使用稳定签名身份（Apple Development）** —— macOS 钥匙串的「始终允许」是按代码签名身份记忆的，ad-hoc 二进制 cdhash 每次 build 都会变，授权挂不住，会反复弹窗。仓库默认配置为 `CODE_SIGN_IDENTITY = "Apple Development"`，配合免费的 Apple Developer 账号即可；如需修改 Team，请在 [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L42-L54) 中调整 `DEVELOPMENT_TEAM`。
 
 ### 开发状态
 
@@ -108,8 +82,8 @@ brew install create-dmg
 | M1 项目骨架 | ✅ |
 | M2 Claude Code 采集 + 计价 | ✅ |
 | M3 API 采集（OpenAI / Anthropic） | ✅ |
-| M4 可视化与体验（图表、回本、多语言） | ✅ |
-| M5 发布打包（ad-hoc DMG） | ✅ |
+| M4 可视化与体验（图表、回本、任务详情、多语言） | ✅ |
+| M5 更多供应商接入（TRAE Solo / Cursor / Gemini / 通义 / DeepSeek / Qoder / 智谱 GLM / 硅基流动 / OpenRouter / StepFun / Mimo / Kimi / 火山引擎 / MiniMax 等） | 🚧 计划中 |
 
 ### 隐私
 
@@ -127,15 +101,17 @@ MIT
 
 ## English
 
-> A native macOS app that unifies token usage and USD / CNY spend across the AI tools on your Mac — Claude Code, OpenAI / Codex, and Anthropic — with a custom-script collector for plugging in any other source.
+> A native macOS app that unifies token usage and USD / CNY spend across AI tools on your Mac — Claude Code, OpenAI, and Anthropic — with a custom-script collector for plugging in any other source.
 
 ### Features
 
-- 📊 **Unified dashboard** — today / week / month / lifetime spend with trends, per-model breakdown, quota cards, and breakeven analysis
+- 📊 **Unified dashboard** — today / week / month / lifetime spend with trends, per-model breakdown, quota cards, cache-hit ratio, 5-hour window breakdown, and breakeven analysis
+- 🧩 **Task-level view** — [TasksView](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views/TasksView.swift) parses `~/.claude/projects/<cwd>/<sessionId>.jsonl` directly, surfacing tokens / cost / model mix per project and session
 - 🔌 **Multi-source collection**
-  - Local log parsing: Claude Code (`~/.claude/projects`), Codex CLI / Codex Desktop (`~/.codex/sessions`)
-  - Official API pull: Anthropic Admin Usage API, OpenAI Organization Usage API
-  - Custom script / HTTP collector — emit JSON from any endpoint or script to plug in your own source
+  - Local log parsing: Claude Code (`~/.claude/projects`)
+  - Official API pull: OpenAI, Anthropic
+  - Custom script collector ([CustomScriptCollector](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Collectors/CustomScriptCollector.swift)) — emit JSON from any script to plug in your own source
+  - 🚧 More providers (TRAE Solo / Cursor / Gemini / Qwen / DeepSeek / Qoder / Zhipu GLM / SiliconFlow / OpenRouter / StepFun / Mimo / Kimi / Volcengine / MiniMax, etc.) are in progress and not yet available
 - 💰 **Accurate pricing** — built-in latest price table (see [PricingTable.json](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Resources/PricingTable.json)), separately costed for input / output / cache write / cache read, with per-entry overrides
 - 📈 **Quota probing** — live Claude subscription quota (Web / OAuth / Composite channels) and Codex quota
 - 💱 **Multi-currency** — USD / CNY toggle with automatic FX rates (see [ExchangeRateService.swift](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Pricing/ExchangeRateService.swift))
@@ -162,13 +138,13 @@ Tokenomics/
 ├── Storage/                     # persistence / Keychain
 ├── Scheduler/                   # background refresh
 ├── Resources/                   # price table, assets
-└── Views/                       # SwiftUI screens
+└── Views/                       # SwiftUI screens (dashboard / breakeven / models / tasks / logs / settings)
 ```
 
 Key directories:
 
 - [Collectors](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Collectors) — every collector implementation
-- [Views](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views) — dashboard, provider detail, model breakdown, breakeven, settings
+- [Views](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Views) — dashboard, breakeven, provider detail, model breakdown, tasks, settings
 - [Models](file:///Users/huangzhe/Documents/Tokenomics/Tokenomics/Models) — `UsageRecord`, `Provider`, `Subscription`, `ModelPricing`, ...
 
 ### Open in Xcode
@@ -187,38 +163,11 @@ open Tokenomics.xcodeproj
 ```
 
 > Or create a new macOS App in Xcode and drag the contents of `Tokenomics/` in.
->
-> Note: App Sandbox **must stay disabled** — a sandboxed app cannot read the `Claude Code-credentials` entry the Claude CLI writes into login keychain, nor reach `~/.claude`. See [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L33-L41).
 
-### Packaging a DMG (free, no Apple Developer Program)
+### Signing & App Sandbox
 
-Use the bundled [release.sh](file:///Users/huangzhe/Documents/Tokenomics/scripts/release.sh) — it ad-hoc signs (identity `-`) with Hardened Runtime and produces a distributable DMG in one shot:
-
-```bash
-# One-time: point xcode-select to Xcode.app (not Command Line Tools)
-sudo xcode-select -s /Applications/Xcode.app
-
-# Optional: nicer DMG layout
-brew install create-dmg
-
-# Build (reads MARKETING_VERSION from project.yml, or pass one)
-./scripts/release.sh
-./scripts/release.sh 0.2.0
-```
-
-Outputs:
-
-- `build/export/Tokenomics.app`
-- `build/Tokenomics-<version>.dmg`
-
-### Install (for end users)
-
-Without a paid Developer ID, Gatekeeper will show "cannot verify the developer" on first launch. Either:
-
-1. **Right-click open**: in Applications, **right-click Tokenomics.app → Open**, then click *Open* in the dialog. Subsequent launches work normally.
-2. **One-liner**: `xattr -dr com.apple.quarantine /Applications/Tokenomics.app`, then double-click.
-
-> After upgrading, you may need to repeat either step (ad-hoc signature's cdhash changes per build).
+- **App Sandbox must stay disabled** — a sandboxed app cannot read the `Claude Code-credentials` entry the Claude CLI writes into login keychain, nor reach `~/.claude`. See [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L36-L41).
+- **Use a stable signing identity (Apple Development)** — macOS keychain remembers the "Always Allow" decision per code-signing identity. An ad-hoc binary's cdhash changes every build, so the grant never sticks and you'll be re-prompted forever. The repo defaults to `CODE_SIGN_IDENTITY = "Apple Development"`; a free Apple Developer account is enough. Adjust `DEVELOPMENT_TEAM` in [project.yml](file:///Users/huangzhe/Documents/Tokenomics/project.yml#L42-L54) if needed.
 
 ### Status
 
@@ -227,8 +176,8 @@ Without a paid Developer ID, Gatekeeper will show "cannot verify the developer" 
 | M1 Project skeleton | ✅ |
 | M2 Claude Code collection + pricing | ✅ |
 | M3 API collectors (OpenAI / Anthropic) | ✅ |
-| M4 Visualization & UX (charts, breakeven, i18n) | ✅ |
-| M5 Release packaging (ad-hoc DMG) | ✅ |
+| M4 Visualization & UX (charts, breakeven, tasks, i18n) | ✅ |
+| M5 More providers (TRAE Solo / Cursor / Gemini / Qwen / DeepSeek / Qoder / Zhipu GLM / SiliconFlow / OpenRouter / StepFun / Mimo / Kimi / Volcengine / MiniMax, etc.) | 🚧 planned |
 
 ### Privacy
 

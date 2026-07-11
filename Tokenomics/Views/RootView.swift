@@ -13,6 +13,8 @@ struct RootView: View {
         case customProvider(String)
         case models
         case tasks
+        case downgrade
+        case stego
         case logs
 
         var id: String {
@@ -23,6 +25,8 @@ struct RootView: View {
             case .customProvider(let key): return "cp-\(key)"
             case .models: return "models"
             case .tasks: return "tasks"
+            case .downgrade: return "downgrade"
+            case .stego: return "stego"
             case .logs: return "logs"
             }
         }
@@ -48,6 +52,12 @@ struct RootView: View {
         }
         .navigationTitle(L10n.tr("app.title"))
         .id(localization.language.rawValue)
+        .onReceive(NotificationCenter.default.publisher(for: .tokenomicsOpenDowngrade)) { _ in
+            selection = .downgrade
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .tokenomicsOpenStego)) { _ in
+            selection = .stego
+        }
     }
 
     private var sidebar: some View {
@@ -61,6 +71,10 @@ struct RootView: View {
                     .tag(SidebarItem.models)
                 Label(L10n.tr("sidebar.tasks"), systemImage: "checklist")
                     .tag(SidebarItem.tasks)
+                Label(L10n.tr("sidebar.downgrade"), systemImage: "shield.lefthalf.filled")
+                    .tag(SidebarItem.downgrade)
+                Label(L10n.tr("sidebar.stego"), systemImage: "eye.trianglebadge.exclamationmark")
+                    .tag(SidebarItem.stego)
                 Label(L10n.tr("sidebar.logs"), systemImage: "doc.text")
                     .tag(SidebarItem.logs)
             }
@@ -105,6 +119,10 @@ struct RootView: View {
             ModelBreakdownView()
         case .tasks:
             TasksView()
+        case .downgrade:
+            DowngradeDetailView()
+        case .stego:
+            StegoDetectionDetailView()
         case .logs:
             LogsView()
         }

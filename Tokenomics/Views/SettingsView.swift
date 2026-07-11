@@ -11,6 +11,7 @@ struct SettingsView: View {
         case providers = "供应商"
         case subscriptions = "订阅"
         case quotaSources = "额度采集"
+        case downgrade = "降级检测"
         case display = "显示"
         case pricing = "单价"
         case data = "数据"
@@ -34,6 +35,10 @@ struct SettingsView: View {
             QuotaSourcesSettings()
                 .tabItem { Label(L10n.tr("settings.tab.quotaSources"), systemImage: "gauge.with.dots.needle.bottom.50percent") }
                 .tag(Tab.quotaSources)
+
+            DowngradeSettings()
+                .tabItem { Label(L10n.tr("settings.tab.downgrade"), systemImage: "shield.lefthalf.filled") }
+                .tag(Tab.downgrade)
 
             DisplaySettings()
                 .tabItem { Label(L10n.tr("settings.tab.display"), systemImage: "paintbrush") }
@@ -1356,6 +1361,114 @@ private struct QuotaSourcesSettings: View {
                 }
                 probing = false
             }
+        }
+    }
+}
+
+// MARK: - Downgrade detection
+
+/// Claude 降级检测配置面板：
+///   - Canary API Key（用户级 `sk-ant-api03-...`，与 admin key 分开保存）
+///   - 启用主动探测开关
+///   - 探测间隔（≥ 1h）
+///   - 立即运行 / 重置基线
+private struct DowngradeSettings: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var canaryKey: String = ""
+    @State private var hasCanaryKey: Bool = false
+    @State private var intervalHours: Double = 6
+
+    var body: some View {
+        Form {
+            Section {
+                Text(L10n.tr("settings.downgrade.intro"))
+                    .font(.callout)
+                Text(L10n.tr("settings.downgrade.disclaimer"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text(L10n.tr("settings.downgrade.section.about"))
+            }
+
+            Section {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading) {
+                        Text(L10n.tr("settings.downgrade.canary.label"))
+                            .font(.body.weight(.medium))
+                        Text(L10n.tr("settings.downgrade.canary.hint"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        SecureField(
+                            hasCanaryKey
+                                ? L10n.tr("settings.keys.placeholder.set")
+                                : L10n.tr("settings.keys.placeholder.unset"),
+                            text: $canaryKey
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 260)
+                        HStack {
+                            Button(L10n.tr("common.save")) {
+                                appState.keychain.set(canaryKey, for: KeychainKey.anthropicCanary)
+                                canaryKey = ""
+                                hasCanaryKey = appState.keychain.hasKey(KeychainKey.anthropicCanary)
+                            }
+                            .disabled(canaryKey.isEmpty)
+                            Button(L10n.tr("common.delete")) {
+                                appState.keychain.delete(KeychainKey.anthropicCanary)
+                                hasCanaryKey = false
+                            }
+                            .disabled(!hasCanaryKey)
+                        }
+                    }
+                }
+            } header: {
+                Text(L10n.tr("settings.downgrade.section.key"))
+            }
+
+            Section {
+                Toggle(
+                    L10n.tr("settings.downgrade.enable"),
+                    isOn: Binding(
+                        get: { appState.downgradeProbeEnabled },
+                        set: { appState.setDowngradeProbeEnabled($0) }
+                    )
+                )
+                HStack {
+                    Text(L10n.tr("settings.downgrade.interval"))
+                    Spacer()
+                    Stepper(
+                        value: $intervalHours,
+                        in: 1...48,
+                        step: 1
+                    ) {
+                        Text(String(format: L10n.tr("settings.downgrade.interval.hours.fmt"),
+                                    Int(intervalHours)))
+                            .monospacedDigit()
+                    }
+                    .onChange(of: intervalHours) { _, newValue in
+                        appState.downgradeProbeIntervalSec = max(3600, Int(newValue * 3600))
+                    }
+                }
+                HStack {
+                    Button(L10n.tr("settings.downgrade.run_now")) {
+                        appState.runDowngradeProbeNow()
+                    }
+                    .disabled(!appState.downgradeProbeEnabled || !hasCanaryKey)
+                    Button(L10n.tr("settings.downgrade.reset_baseline")) {
+                        appState.resetDowngradeBaseline()
+                    }
+                }
+            } header: {
+                Text(L10n.tr("settings.downgrade.section.control"))
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            hasCanaryKey = appState.keychain.hasKey(KeychainKey.anthropicCanary)
+            intervalHours = max(1, Double(appState.downgradeProbeIntervalSec) / 3600)
         }
     }
 }

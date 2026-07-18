@@ -11,8 +11,7 @@ struct TokenomicsApp: App {
             UsageRecord.self,
             CollectorState.self,
             PricingOverride.self,
-            CustomProvider.self,
-            DowngradeSignal.self
+            CustomProvider.self
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

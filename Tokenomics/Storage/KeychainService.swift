@@ -51,8 +51,4 @@ final class KeychainService {
 enum KeychainKey {
     static let openai     = "api.openai"
     static let anthropic  = "api.anthropic"
-    /// 用户级 Anthropic API key（`sk-ant-api03-...`），用于 ClaudeDowngradeProbe 打
-    /// `/v1/messages` 做金标探测。与 `anthropic`（admin key）分开，因为 admin key
-    /// 只能访问 `/v1/organizations/*` 端点。
-    static let anthropicCanary = "api.anthropic.canary"
 }

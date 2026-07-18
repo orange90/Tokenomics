@@ -50,32 +50,6 @@ struct DashboardView: View {
                     }
                 }
 
-                section(L10n.tr("dashboard.section.downgrade")) {
-                    DowngradeCard(
-                        verdict: appState.downgradeHealth,
-                        enabled: appState.downgradeProbeEnabled,
-                        hasCanaryKey: appState.keychain.hasKey(KeychainKey.anthropicCanary),
-                        lastCheckedAt: appState.lastDowngradeProbeAt,
-                        onTapDetail: {
-                            NotificationCenter.default.post(name: .tokenomicsOpenDowngrade, object: nil)
-                        }
-                    )
-                }
-
-                section(L10n.tr("dashboard.section.stego")) {
-                    StegoDetectionCard(
-                        report: appState.stegoProbe.latestReport,
-                        isScanning: appState.stegoProbe.isScanning,
-                        progress: appState.stegoProbe.progress,
-                        onScanNow: {
-                            Task { await appState.stegoProbe.runFullScan() }
-                        },
-                        onTapDetail: {
-                            NotificationCenter.default.post(name: .tokenomicsOpenStego, object: nil)
-                        }
-                    )
-                }
-
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
                     GridItem(.flexible()),
